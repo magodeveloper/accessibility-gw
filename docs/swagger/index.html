@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessibility Platform API Gateway - Documentación Completa</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2.5rem;
+        }
+
+        .header p {
+            margin: 0;
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .service-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .service-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .service-title {
+            color: #4a5568;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0 0 1rem 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .service-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 0.5rem;
+            background: #667eea;
+            border-radius: 4px;
+        }
+
+        .service-description {
+            color: #718096;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .endpoint-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .endpoint-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f7fafc;
+        }
+
+        .method {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-right: 0.75rem;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .method.get {
+            background: #48bb78;
+            color: white;
+        }
+
+        .method.post {
+            background: #38b2ac;
+            color: white;
+        }
+
+        .method.put {
+            background: #ed8936;
+            color: white;
+        }
+
+        .method.delete {
+            background: #f56565;
+            color: white;
+        }
+
+        .endpoint-path {
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.875rem;
+            color: #2d3748;
+        }
+
+        .swagger-container {
+            margin-top: 3rem;
+            border-top: 2px solid #e2e8f0;
+            padding-top: 2rem;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .nav-tab {
+            padding: 0.75rem 1.5rem;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .nav-tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: #edf2f7;
+        }
+
+        .quick-start {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .quick-start h3 {
+            margin-top: 0;
+            color: #4a5568;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🚀 Accessibility Platform API Gateway</h1>
+        <p>Documentación completa de endpoints para la plataforma de accesibilidad</p>
+    </div>
+
+    <div class="container">
+        <div class="quick-start">
+            <h3>🚀 Inicio Rápido</h3>
+            <p>Para empezar a usar la API:</p>
+            <ol>
+                <li><strong>Autenticarse:</strong> POST <code>/api/v1/auth/login</code> para obtener JWT token</li>
+                <li><strong>Incluir token:</strong> Agregar header <code>Authorization: Bearer &lt;token&gt;</code></li>
+                <li><strong>Usar endpoints:</strong> Llamar a cualquier endpoint documentado abajo</li>
+            </ol>
+
+            <div class="code-block">
+                # Ejemplo de autenticación
+                curl -X POST "http://localhost:8000/api/v1/auth/login" \
+                -H "Content-Type: application/json" \
+                -d '{
+                "email": "user@example.com",
+                "password": "password123"
+                }'
+
+                # Usar el token en peticiones
+                curl -X GET "http://localhost:8000/api/v1/users" \
+                -H "Authorization: Bearer YOUR_JWT_TOKEN"
+            </div>
+        </div>
+
+        <h2>📋 Servicios Disponibles</h2>
+        <div class="services-grid">
+            <div class="service-card">
+                <h3 class="service-title">
+                    <div class="service-icon"></div>
+                    Gateway Principal
+                </h3>
+                <p class="service-description">
+                    Punto de entrada principal para traducir y enrutar peticiones a microservicios.
+                    Incluye caché, métricas y monitoreo.
+                </p>
+                <ul class="endpoint-list">
+                    <li class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/v1/translate</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/v1/services/{service}/{path}</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/health</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/metrics</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="service-card">
+                <h3 class="service-title">
+                    <div class="service-icon"></div>
+                    Users & Auth
+                </h3>
+                <p class="service-description">
+                    Gestión completa de usuarios, autenticación JWT y preferencias de usuario.
+                    Incluye registro, login y gestión de perfiles.
+                </p>
+                <ul class="endpoint-list">
+                    <li class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/v1/auth/login</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/v1/auth/register</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/v1/users</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/v1/users/{id}</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/v1/users/{id}/preferences</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="service-card">
+                <h3 class="service-title">
+                    <div class="service-icon"></div>
+                    Reports
+                </h3>
+                <p class="service-description">
+                    Generación y gestión de reportes de accesibilidad. Incluye historial,
+                    exportación en múltiples formatos y métricas.
+                </p>
+                <ul class="endpoint-list">
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/report</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/report</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/report/{id}</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/report-history</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="service-card">
+                <h3 class="service-title">
+                    <div class="service-icon"></div>
+                    Analysis
+                </h3>
+                <p class="service-description">
+                    Motor de análisis de accesibilidad con soporte para múltiples niveles WCAG,
+                    resultados detallados y gestión de errores.
+                </p>
+                <ul class="endpoint-list">
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/analysis</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/analysis</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/result</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/error</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="service-card">
+                <h3 class="service-title">
+                    <div class="service-icon"></div>
+                    Accessibility Tools
+                </h3>
+                <p class="service-description">
+                    Herramientas avanzadas de análisis con axe-core y Equal Access.
+                    Soporte para análisis por lotes y múltiples formatos.
+                </p>
+                <ul class="endpoint-list">
+                    <li class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/analyze/url</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/analyze/html</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/analyze/batch</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="service-card">
+                <h3 class="service-title">
+                    <div class="service-icon"></div>
+                    Monitoring
+                </h3>
+                <p class="service-description">
+                    Monitoreo completo del gateway con health checks, métricas en tiempo real
+                    y gestión de caché distribuido.
+                </p>
+                <ul class="endpoint-list">
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/health/live</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/health/ready</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/metrics</span>
+                    </li>
+                    <li class="endpoint-item">
+                        <span class="method delete">DEL</span>
+                        <span class="endpoint-path">/cache/{service}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="swagger-container">
+            <h2>📖 Documentación Swagger Interactiva</h2>
+            <p>Explora todos los endpoints, esquemas y prueba las APIs directamente desde tu navegador.</p>
+
+            <div class="nav-tabs">
+                <div class="nav-tab active" onclick="showSwagger('local')">Desarrollo Local</div>
+                <div class="nav-tab" onclick="showSwagger('production')">Producción</div>
+                <div class="nav-tab" onclick="showSwagger('yaml')">Especificación YAML</div>
+            </div>
+
+            <div id="swagger-ui-local" class="swagger-ui-container"></div>
+            <div id="swagger-ui-production" class="swagger-ui-container" style="display:none;"></div>
+            <div id="yaml-container" style="display:none;">
+                <iframe src="gateway-complete-api.yaml"
+                    style="width:100%;height:600px;border:1px solid #e2e8f0;border-radius:4px;"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui-bundle.js"></script>
+    <script>
+        let swaggerInstances = {};
+
+        function initSwagger() {
+            // Instancia para desarrollo local
+            swaggerInstances.local = SwaggerUIBundle({
+                url: './gateway-complete-api.yaml',
+                dom_id: '#swagger-ui-local',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIBundle.presets.standalone
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                defaultModelsExpandDepth: 2,
+                defaultModelExpandDepth: 2,
+                docExpansion: 'list',
+                filter: true,
+                showRequestHeaders: true,
+                showCommonExtensions: true,
+                tryItOutEnabled: true,
+                requestInterceptor: (request) => {
+                    // Interceptar peticiones para agregar el token si está disponible
+                    const token = localStorage.getItem('jwt-token');
+                    if (token) {
+                        request.headers['Authorization'] = `Bearer ${token}`;
+                    }
+                    return request;
+                }
+            });
+        }
+
+        function showSwagger(type) {
+            // Actualizar tabs activos
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Mostrar/ocultar contenedores
+            document.querySelectorAll('.swagger-ui-container, #yaml-container').forEach(container => {
+                container.style.display = 'none';
+            });
+
+            if (type === 'yaml') {
+                document.getElementById('yaml-container').style.display = 'block';
+            } else {
+                document.getElementById(`swagger-ui-${type}`).style.display = 'block';
+
+                // Inicializar Swagger para producción si es necesario
+                if (type === 'production' && !swaggerInstances.production) {
+                    setTimeout(() => {
+                        swaggerInstances.production = SwaggerUIBundle({
+                            url: './gateway-complete-api.yaml',
+                            dom_id: '#swagger-ui-production',
+                            deepLinking: true,
+                            presets: [
+                                SwaggerUIBundle.presets.apis,
+                                SwaggerUIBundle.presets.standalone
+                            ],
+                            plugins: [
+                                SwaggerUIBundle.plugins.DownloadUrl
+                            ],
+                            layout: "StandaloneLayout",
+                            defaultModelsExpandDepth: 2,
+                            defaultModelExpandDepth: 2,
+                            docExpansion: 'list',
+                            filter: true,
+                            showRequestHeaders: true,
+                            showCommonExtensions: true,
+                            tryItOutEnabled: true,
+                            servers: [
+                                {
+                                    url: 'https://api.accessibility.company.com',
+                                    description: 'Producción'
+                                }
+                            ]
+                        });
+                    }, 100);
+                }
+            }
+        }
+
+        // Función para guardar el token JWT en localStorage
+        function saveJwtToken() {
+            const token = prompt('Ingresa tu JWT token para probar los endpoints que requieren autenticación:');
+            if (token) {
+                localStorage.setItem('jwt-token', token);
+                alert('Token guardado exitosamente. Ahora puedes probar los endpoints autenticados.');
+            }
+        }
+
+        // Inicializar cuando se carga la página
+        document.addEventListener('DOMContentLoaded', function () {
+            initSwagger();
+
+            // Agregar botón para guardar token
+            const container = document.querySelector('.container');
+            const tokenButton = document.createElement('div');
+            tokenButton.innerHTML = `
+                <div style="text-align: center; margin: 2rem 0;">
+                    <button onclick="saveJwtToken()" style="
+                        background: #667eea;
+                        color: white;
+                        border: none;
+                        padding: 0.75rem 1.5rem;
+                        border-radius: 4px;
+                        font-size: 1rem;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    " onmouseover="this.style.background='#5a67d8'" onmouseout="this.style.background='#667eea'">
+                        🔑 Configurar JWT Token para Testing
+                    </button>
+                </div>
+            `;
+            container.insertBefore(tokenButton, document.querySelector('.swagger-container'));
+        });
+    </script>
+</body>
+
+</html>

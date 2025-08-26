@@ -52,3 +52,32 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Application specific files
+logs/
+*.log
+*.log.*
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+!appsettings.Production.json
+
+# Docker
+.env
+.env.local
+
+# Health checks
+.health
+health_check
+
+# Certificates
+*.pfx
+*.p12
+*.key
+*.pem
+*.crt
+*.cer
+
+# IDE specific
+.vscode/
+.idea/

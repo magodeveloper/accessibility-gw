@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  accessibility-gateway:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    container_name: accessibility-gw
+    ports:
+      - "8000:8080"
+      - "8001:8081"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - Gate__Services__users=http://accessibility-ms-users:8080
+      - Gate__Services__reports=http://accessibility-ms-reports:8081
+      - Gate__Services__analysis=http://accessibility-ms-analysis:8082
+      - Gate__Services__middleware=http://accessibility-mw:3000
+      - Redis__ConnectionString=redis:6379
+      - Jwt__Authority=https://accessibility-auth:5001
+      - Jwt__Audience=accessibility-gateway
+    depends_on:
+      - redis
+    volumes:
+      - gateway-logs:/app/logs
+    networks:
+      - accessibility-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: accessibility-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - accessibility-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Servicios externos (cuando estén disponibles)
+  # accessibility-ms-users:
+  #   image: accessibility-ms-users:latest
+  #   container_name: accessibility-ms-users
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - accessibility-network
+
+  # accessibility-ms-reports:
+  #   image: accessibility-ms-reports:latest
+  #   container_name: accessibility-ms-reports
+  #   ports:
+  #     - "8081:8081"
+  #   networks:
+  #     - accessibility-network
+
+  # accessibility-ms-analysis:
+  #   image: accessibility-ms-analysis:latest
+  #   container_name: accessibility-ms-analysis
+  #   ports:
+  #     - "8082:8082"
+  #   networks:
+  #     - accessibility-network
+
+  # accessibility-mw:
+  #   image: accessibility-mw:latest
+  #   container_name: accessibility-mw
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - accessibility-network
+
+volumes:
+  gateway-logs:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  accessibility-network:
+    driver: bridge
+    name: accessibility-network

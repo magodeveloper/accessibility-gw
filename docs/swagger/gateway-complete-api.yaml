@@ -1,0 +1,1725 @@
+openapi: 3.0.3
+info:
+  title: Accessibility Platform API Gateway
+  description: |
+    API Gateway completo para la plataforma de accesibilidad que incluye todos los endpoints 
+    de los microservicios y el middleware de análisis.
+    
+    ## Arquitectura
+    
+    El gateway actúa como punto de entrada único para:
+    - **accessibility-ms-users**: Gestión de usuarios y autenticación
+    - **accessibility-ms-reports**: Generación y gestión de reportes
+    - **accessibility-ms-analysis**: Análisis de accesibilidad 
+    - **accessibility-mw**: Middleware de análisis con herramientas especializadas
+    
+    ## Autenticación
+    
+    La mayoría de endpoints requieren autenticación JWT. Incluye el token en el header:
+    ```
+    Authorization: Bearer <jwt-token>
+    ```
+    
+    ## Rate Limiting
+    
+    - **General**: 100 req/min por IP
+    - **Análisis**: 20 req/min por IP (endpoints computacionalmente intensivos)
+    
+    ## Caché
+    
+    Los endpoints GET pueden ser cacheados por el gateway. Usa el parámetro `useCache=false` para evitar caché.
+    
+  version: 1.0.0
+  contact:
+    name: Accessibility Team
+    email: accessibility@company.com
+  license:
+    name: MIT License
+servers:
+  - url: http://localhost:8000
+    description: Desarrollo local
+  - url: https://api.accessibility.company.com
+    description: Producción
+
+paths:
+  # =====================================
+  # GATEWAY ENDPOINTS
+  # =====================================
+  
+  /api/v1/translate:
+    post:
+      tags: [Gateway]
+      summary: Traducir petición HTTP
+      description: |
+        Endpoint principal del gateway para traducir y enviar peticiones HTTP 
+        a los microservicios de destino.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranslateRequest'
+            examples:
+              getUserExample:
+                summary: Obtener usuario por ID
+                value:
+                  service: "users"
+                  method: "GET"
+                  path: "/api/v1/users/123"
+                  useCache: true
+              createReportExample:
+                summary: Crear nuevo reporte
+                value:
+                  service: "reports"
+                  method: "POST"
+                  path: "/api/report"
+                  body:
+                    title: "Análisis de Accesibilidad Web"
+                    analysisId: 456
+              analyzeWebsiteExample:
+                summary: Analizar sitio web
+                value:
+                  service: "middleware"
+                  method: "POST"
+                  path: "/api/analyze/url"
+                  body:
+                    url: "https://example.com"
+                    tools: ["axe", "equalAccess"]
+                    wcagLevel: "AA"
+      responses:
+        '200':
+          description: Petición procesada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/v1/services/{service}/{path}:
+    get:
+      tags: [Gateway]
+      summary: Llamada directa a servicio (GET)
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [users, reports, analysis, middleware]
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Respuesta del servicio
+    post:
+      tags: [Gateway]
+      summary: Llamada directa a servicio (POST)
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [users, reports, analysis, middleware]
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Respuesta del servicio
+    put:
+      tags: [Gateway]
+      summary: Llamada directa a servicio (PUT)
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [users, reports, analysis, middleware]
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Respuesta del servicio
+    delete:
+      tags: [Gateway]
+      summary: Llamada directa a servicio (DELETE)
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [users, reports, analysis, middleware]
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Respuesta del servicio
+
+  # =====================================
+  # USERS MICROSERVICE ENDPOINTS
+  # =====================================
+  
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Iniciar sesión
+      description: Autentica un usuario y crea una sesión activa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "securePassword123"
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  user:
+                    $ref: '#/components/schemas/UserWithPreference'
+        '401':
+          description: Credenciales inválidas
+        '403':
+          description: Usuario inactivo o bloqueado
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Cerrar sesión
+      description: Cierra todas las sesiones del usuario
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout exitoso
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Registrar nuevo usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nickname, name, lastname, email, password]
+              properties:
+                nickname:
+                  type: string
+                  example: "johndoe"
+                name:
+                  type: string
+                  example: "John"
+                lastname:
+                  type: string
+                  example: "Doe"
+                email:
+                  type: string
+                  format: email
+                  example: "john@example.com"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '201':
+          description: Usuario creado exitosamente
+        '400':
+          description: Datos inválidos o email ya existe
+
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: Listar todos los usuarios
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /api/v1/users/{id}:
+    get:
+      tags: [Users]
+      summary: Obtener usuario por ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Usuario no encontrado
+    put:
+      tags: [Users]
+      summary: Actualizar usuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Usuario actualizado
+        '404':
+          description: Usuario no encontrado
+    delete:
+      tags: [Users]
+      summary: Eliminar usuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Usuario eliminado
+        '404':
+          description: Usuario no encontrado
+
+  /api/v1/users/by-email:
+    get:
+      tags: [Users]
+      summary: Buscar usuario por email
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: Usuario encontrado
+        '404':
+          description: Usuario no encontrado
+
+  /api/v1/users/{id}/preferences:
+    get:
+      tags: [User Preferences]
+      summary: Obtener preferencias del usuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Preferencias del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreference'
+    put:
+      tags: [User Preferences]
+      summary: Actualizar preferencias del usuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceUpdate'
+      responses:
+        '200':
+          description: Preferencias actualizadas
+
+  # =====================================
+  # REPORTS MICROSERVICE ENDPOINTS
+  # =====================================
+  
+  /api/report:
+    get:
+      tags: [Reports]
+      summary: Listar todos los reportes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista de reportes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Report'
+        '404':
+          description: No se encontraron reportes
+    post:
+      tags: [Reports]
+      summary: Crear nuevo reporte
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, analysisId]
+              properties:
+                title:
+                  type: string
+                  example: "Reporte de Accesibilidad Web"
+                analysisId:
+                  type: integer
+                  example: 123
+                content:
+                  type: string
+                  description: Contenido HTML del reporte
+      responses:
+        '201':
+          description: Reporte creado exitosamente
+        '400':
+          description: Datos inválidos
+
+  /api/report/{id}:
+    get:
+      tags: [Reports]
+      summary: Obtener reporte por ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Reporte encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '404':
+          description: Reporte no encontrado
+    put:
+      tags: [Reports]
+      summary: Actualizar reporte
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Reporte actualizado
+        '404':
+          description: Reporte no encontrado
+    delete:
+      tags: [Reports]
+      summary: Eliminar reporte
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Reporte eliminado
+        '404':
+          description: Reporte no encontrado
+
+  /api/report/by-analysis/{analysisId}:
+    get:
+      tags: [Reports]
+      summary: Obtener reportes por ID de análisis
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Reportes encontrados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Report'
+        '404':
+          description: No se encontraron reportes para el análisis
+
+  /api/report-history:
+    get:
+      tags: [Report History]
+      summary: Obtener historial de reportes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Historial de reportes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportHistory'
+
+  # =====================================
+  # ANALYSIS MICROSERVICE ENDPOINTS
+  # =====================================
+  
+  /api/analysis:
+    get:
+      tags: [Analysis]
+      summary: Listar todos los análisis
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de análisis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  analyses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Analysis'
+                  message:
+                    type: string
+    post:
+      tags: [Analysis]
+      summary: Crear nuevo análisis
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, userId]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  example: "https://example.com"
+                userId:
+                  type: integer
+                  example: 123
+                type:
+                  type: string
+                  enum: [basic, advanced, full]
+                  default: basic
+                wcagLevel:
+                  type: string
+                  enum: [A, AA, AAA]
+                  default: AA
+      responses:
+        '201':
+          description: Análisis creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Analysis'
+        '400':
+          description: Datos inválidos
+
+  /api/analysis/{id}:
+    get:
+      tags: [Analysis]
+      summary: Obtener análisis por ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Análisis encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Analysis'
+        '404':
+          description: Análisis no encontrado
+
+  /api/analysis/by-user:
+    get:
+      tags: [Analysis]
+      summary: Obtener análisis por usuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Análisis encontrados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  analyses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Analysis'
+
+  /api/analysis/by-date-range:
+    get:
+      tags: [Analysis]
+      summary: Obtener análisis por rango de fechas
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: fromDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: toDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Análisis encontrados
+
+  /api/result:
+    get:
+      tags: [Analysis Results]
+      summary: Obtener todos los resultados de análisis
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de resultados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisResult'
+    post:
+      tags: [Analysis Results]
+      summary: Crear resultado de análisis
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisResultCreate'
+      responses:
+        '201':
+          description: Resultado creado
+
+  /api/error:
+    get:
+      tags: [Analysis Errors]
+      summary: Obtener errores de análisis
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: analysisId
+          in: query
+          schema:
+            type: integer
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+      responses:
+        '200':
+          description: Lista de errores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisError'
+
+  # =====================================
+  # ACCESSIBILITY MIDDLEWARE ENDPOINTS
+  # =====================================
+  
+  /api/analyze/url:
+    post:
+      tags: [Accessibility Analysis]
+      summary: Analizar URL con herramientas de accesibilidad
+      description: |
+        Ejecuta análisis de accesibilidad en una URL específica usando herramientas
+        como axe-core y Equal Access Accessibility Checker.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  example: "https://example.com"
+                  description: URL a analizar
+                tools:
+                  type: array
+                  items:
+                    type: string
+                    enum: [axe, equalAccess]
+                  default: ["axe", "equalAccess"]
+                  description: Herramientas de análisis a usar
+                wcagLevel:
+                  type: string
+                  enum: [A, AA, AAA]
+                  default: "AA"
+                  description: Nivel de conformidad WCAG
+                wcagVersion:
+                  type: string
+                  enum: ["2.1", "2.2"]
+                  default: "2.1"
+                  description: Versión de WCAG
+                waitForLoadState:
+                  type: string
+                  enum: [load, domcontentloaded, networkidle]
+                  default: "networkidle"
+                  description: Estado de carga a esperar
+                timeout:
+                  type: integer
+                  default: 30000
+                  description: Timeout en milisegundos
+                includeScreenshot:
+                  type: boolean
+                  default: false
+                  description: Incluir screenshot en los resultados
+                viewport:
+                  type: object
+                  properties:
+                    width:
+                      type: integer
+                      default: 1366
+                    height:
+                      type: integer
+                      default: 768
+      responses:
+        '200':
+          description: Análisis completado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessibilityAnalysisResult'
+        '400':
+          description: URL inválida o parámetros incorrectos
+        '422':
+          description: Error durante el análisis
+        '429':
+          description: Límite de rate limiting excedido
+
+  /api/analyze/html:
+    post:
+      tags: [Accessibility Analysis]
+      summary: Analizar HTML directo
+      description: Analiza contenido HTML proporcionado directamente
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [html]
+              properties:
+                html:
+                  type: string
+                  example: "<html><body><h1>Test</h1></body></html>"
+                  description: Contenido HTML a analizar
+                tools:
+                  type: array
+                  items:
+                    type: string
+                    enum: [axe, equalAccess]
+                  default: ["axe", "equalAccess"]
+                wcagLevel:
+                  type: string
+                  enum: [A, AA, AAA]
+                  default: "AA"
+                wcagVersion:
+                  type: string
+                  enum: ["2.1", "2.2"]
+                  default: "2.1"
+      responses:
+        '200':
+          description: Análisis completado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessibilityAnalysisResult'
+        '400':
+          description: HTML inválido o parámetros incorrectos
+
+  /api/analyze/batch:
+    post:
+      tags: [Accessibility Analysis]
+      summary: Análisis en lote de múltiples URLs
+      description: |
+        Ejecuta análisis de accesibilidad en múltiples URLs de forma paralela.
+        Útil para análisis de sitios completos o múltiples páginas.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [urls]
+              properties:
+                urls:
+                  type: array
+                  items:
+                    type: string
+                    format: uri
+                  maxItems: 10
+                  example: ["https://example.com", "https://example.com/about"]
+                  description: Lista de URLs a analizar (máximo 10)
+                tools:
+                  type: array
+                  items:
+                    type: string
+                    enum: [axe, equalAccess]
+                  default: ["axe", "equalAccess"]
+                wcagLevel:
+                  type: string
+                  enum: [A, AA, AAA]
+                  default: "AA"
+                parallelism:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  default: 2
+                  description: Número de análisis paralelos
+      responses:
+        '200':
+          description: Análisis en lote completado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccessibilityAnalysisResult'
+                  summary:
+                    type: object
+                    properties:
+                      totalUrls:
+                        type: integer
+                      successfulAnalyses:
+                        type: integer
+                      failedAnalyses:
+                        type: integer
+                      totalViolations:
+                        type: integer
+                      totalWarnings:
+                        type: integer
+
+  # =====================================
+  # GATEWAY MANAGEMENT ENDPOINTS
+  # =====================================
+  
+  /health:
+    get:
+      tags: [Health & Monitoring]
+      summary: Verificación de salud básica
+      parameters:
+        - name: deep
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Realizar verificación profunda de servicios
+        - name: includeMetrics
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Incluir métricas en la respuesta
+      responses:
+        '200':
+          description: Sistema saludable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+        '503':
+          description: Sistema no saludable
+
+  /health/live:
+    get:
+      tags: [Health & Monitoring]
+      summary: Liveness probe
+      description: Endpoint para verificar que el gateway está vivo (Kubernetes)
+      responses:
+        '200':
+          description: Gateway está vivo
+        '503':
+          description: Gateway no está respondiendo
+
+  /health/ready:
+    get:
+      tags: [Health & Monitoring]
+      summary: Readiness probe
+      description: Endpoint para verificar que el gateway está listo (Kubernetes)
+      responses:
+        '200':
+          description: Gateway está listo
+        '503':
+          description: Gateway no está listo
+
+  /metrics:
+    get:
+      tags: [Health & Monitoring]
+      summary: Métricas del gateway
+      description: |
+        Obtiene métricas detalladas del gateway incluyendo:
+        - Número total de peticiones
+        - Tasa de éxito/error
+        - Tiempos de respuesta promedio
+        - Estadísticas por servicio
+        - Hit rate de caché
+      responses:
+        '200':
+          description: Métricas del gateway
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRequests:
+                    type: integer
+                  successfulRequests:
+                    type: integer
+                  failedRequests:
+                    type: integer
+                  cachedRequests:
+                    type: integer
+                  successRate:
+                    type: number
+                    format: float
+                  cacheHitRate:
+                    type: number
+                    format: float
+                  requestsByService:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  requestsByStatusCode:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  averageResponseTimes:
+                    type: object
+                    additionalProperties:
+                      type: number
+                      format: float
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /metrics/reset:
+    post:
+      tags: [Health & Monitoring]
+      summary: Reiniciar métricas
+      description: Reinicia todas las métricas del gateway a cero
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Métricas reiniciadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Metrics reset successfully"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /cache/{service}:
+    delete:
+      tags: [Cache Management]
+      summary: Invalidar caché por servicio
+      description: Invalida todas las entradas de caché para un servicio específico
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [users, reports, analysis, middleware]
+      responses:
+        '200':
+          description: Caché invalidado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Cache invalidated for service: users"
+
+  /info:
+    get:
+      tags: [Gateway Info]
+      summary: Información del gateway
+      description: |
+        Información general sobre el gateway incluyendo:
+        - Versión actual
+        - Servicios configurados
+        - Características habilitadas
+        - Configuración de entorno
+      responses:
+        '200':
+          description: Información del gateway
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "Accessibility Gateway"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  environment:
+                    type: string
+                    example: "Production"
+                  services:
+                    type: array
+                    items:
+                      type: string
+                    example: ["users", "reports", "analysis", "middleware"]
+                  features:
+                    type: object
+                    properties:
+                      caching:
+                        type: boolean
+                      metrics:
+                        type: boolean
+                      tracing:
+                        type: boolean
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: No autorizado - Token JWT inválido o ausente
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Unauthorized access"
+    
+    Forbidden:
+      description: Prohibido - Permisos insuficientes
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Route not allowed by ACL"
+    
+    BadRequest:
+      description: Petición incorrecta
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Invalid request parameters"
+    
+    PayloadTooLarge:
+      description: Payload demasiado grande
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Payload too large"
+    
+    BadGateway:
+      description: Error del gateway - Servicio de destino no disponible
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Upstream service unavailable"
+
+  schemas:
+    TranslateRequest:
+      type: object
+      required: [service, method, path]
+      properties:
+        service:
+          type: string
+          enum: [users, reports, analysis, middleware]
+          description: Servicio de destino
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE]
+          description: Método HTTP
+        path:
+          type: string
+          description: Ruta del endpoint
+          example: "/api/users/123"
+        query:
+          type: object
+          additionalProperties:
+            type: string
+          description: Parámetros de query string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Headers HTTP personalizados
+        body:
+          type: object
+          description: Cuerpo de la petición (para POST, PUT, PATCH)
+        useCache:
+          type: boolean
+          default: true
+          description: Usar caché si está disponible (solo GET)
+        cacheExpirationMinutes:
+          type: integer
+          description: Tiempo de expiración del caché en minutos
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        nickname:
+          type: string
+        name:
+          type: string
+        lastname:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, user, analyst]
+        status:
+          type: string
+          enum: [active, inactive, blocked]
+        emailConfirmed:
+          type: boolean
+        lastLogin:
+          type: string
+          format: date-time
+          nullable: true
+        registrationDate:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserUpdate:
+      type: object
+      properties:
+        nickname:
+          type: string
+        name:
+          type: string
+        lastname:
+          type: string
+        email:
+          type: string
+          format: email
+
+    UserPreference:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        wcagVersion:
+          type: string
+        wcagLevel:
+          type: string
+          enum: [A, AA, AAA]
+        language:
+          type: string
+          enum: [es, en, fr]
+        visualTheme:
+          type: string
+          enum: [light, dark, highContrast]
+        reportFormat:
+          type: string
+          enum: [pdf, html, csv]
+        notificationsEnabled:
+          type: boolean
+        aiResponseLevel:
+          type: string
+          enum: [basic, detailed, expert]
+        fontSize:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserPreferenceUpdate:
+      type: object
+      properties:
+        wcagVersion:
+          type: string
+        wcagLevel:
+          type: string
+          enum: [A, AA, AAA]
+        language:
+          type: string
+          enum: [es, en, fr]
+        visualTheme:
+          type: string
+          enum: [light, dark, highContrast]
+        reportFormat:
+          type: string
+          enum: [pdf, html, csv]
+        notificationsEnabled:
+          type: boolean
+        aiResponseLevel:
+          type: string
+          enum: [basic, detailed, expert]
+        fontSize:
+          type: integer
+
+    UserWithPreference:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            preference:
+              $ref: '#/components/schemas/UserPreference'
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        analysisId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [draft, published, archived]
+        format:
+          type: string
+          enum: [html, pdf, csv]
+        size:
+          type: integer
+          description: Tamaño del reporte en bytes
+
+    ReportHistory:
+      type: object
+      properties:
+        reportId:
+          type: integer
+        action:
+          type: string
+          enum: [created, updated, deleted, published]
+        userId:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+
+    Analysis:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+          format: uri
+        userId:
+          type: integer
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        type:
+          type: string
+          enum: [basic, advanced, full]
+        wcagLevel:
+          type: string
+          enum: [A, AA, AAA]
+        wcagVersion:
+          type: string
+          enum: ["2.1", "2.2"]
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        duration:
+          type: integer
+          description: Duración en segundos
+        errorCount:
+          type: integer
+        warningCount:
+          type: integer
+        successCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    AnalysisResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        analysisId:
+          type: integer
+        ruleId:
+          type: string
+        severity:
+          type: string
+          enum: [error, warning, info]
+        impact:
+          type: string
+          enum: [critical, serious, moderate, minor]
+        description:
+          type: string
+        element:
+          type: string
+        selector:
+          type: string
+        xpath:
+          type: string
+        wcagCriterion:
+          type: string
+        remediation:
+          type: string
+
+    AnalysisResultCreate:
+      type: object
+      required: [analysisId, ruleId, severity]
+      properties:
+        analysisId:
+          type: integer
+        ruleId:
+          type: string
+        severity:
+          type: string
+          enum: [error, warning, info]
+        impact:
+          type: string
+          enum: [critical, serious, moderate, minor]
+        description:
+          type: string
+        element:
+          type: string
+        selector:
+          type: string
+
+    AnalysisError:
+      type: object
+      properties:
+        id:
+          type: integer
+        analysisId:
+          type: integer
+        errorType:
+          type: string
+        errorMessage:
+          type: string
+        stackTrace:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        resolved:
+          type: boolean
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    AccessibilityAnalysisResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        url:
+          type: string
+          format: uri
+        analysisTime:
+          type: integer
+          description: Tiempo de análisis en milisegundos
+        tools:
+          type: array
+          items:
+            type: string
+        wcagLevel:
+          type: string
+        wcagVersion:
+          type: string
+        summary:
+          type: object
+          properties:
+            totalIssues:
+              type: integer
+            violations:
+              type: integer
+            warnings:
+              type: integer
+            recommendations:
+              type: integer
+            passes:
+              type: integer
+        results:
+          type: object
+          properties:
+            axe:
+              type: object
+              properties:
+                violations:
+                  type: array
+                  items:
+                    type: object
+                passes:
+                  type: array
+                  items:
+                    type: object
+                incomplete:
+                  type: array
+                  items:
+                    type: object
+            equalAccess:
+              type: object
+              properties:
+                violations:
+                  type: array
+                  items:
+                    type: object
+                recommendations:
+                  type: array
+                  items:
+                    type: object
+                potentialViolations:
+                  type: array
+                  items:
+                    type: object
+        screenshot:
+          type: string
+          description: Screenshot en base64 (si se solicitó)
+        metadata:
+          type: object
+          properties:
+            title:
+              type: string
+            viewport:
+              type: object
+              properties:
+                width:
+                  type: integer
+                height:
+                  type: integer
+            loadTime:
+              type: integer
+            timestamp:
+              type: string
+              format: date-time
+
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Healthy, Unhealthy, Degraded]
+        totalDuration:
+          type: string
+          description: Duración total de la verificación
+        services:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [Healthy, Unhealthy, Degraded]
+              description:
+                type: string
+              duration:
+                type: string
+              data:
+                type: object
+        metrics:
+          type: object
+          description: Métricas adicionales (si se solicitan)
+
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        totalItems:
+          type: integer
+        itemsPerPage:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
+tags:
+  - name: Gateway
+    description: Endpoints principales del gateway para traducción de peticiones
+  - name: Authentication
+    description: Autenticación y gestión de sesiones
+  - name: Users
+    description: Gestión de usuarios
+  - name: User Preferences
+    description: Preferencias de usuario
+  - name: Reports
+    description: Gestión de reportes de accesibilidad
+  - name: Report History
+    description: Historial de reportes
+  - name: Analysis
+    description: Análisis de accesibilidad
+  - name: Analysis Results
+    description: Resultados de análisis
+  - name: Analysis Errors
+    description: Errores de análisis
+  - name: Accessibility Analysis
+    description: Herramientas avanzadas de análisis de accesibilidad
+  - name: Health & Monitoring
+    description: Verificaciones de salud y monitoreo
+  - name: Cache Management
+    description: Gestión de caché
+  - name: Gateway Info
+    description: Información del gateway

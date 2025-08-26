@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  accessibility-gateway-dev:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+      target: build  # Usar la etapa de build para desarrollo
+    container_name: accessibility-gw-dev
+    ports:
+      - "8000:8080"
+      - "8001:8081"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Gate__Services__users=http://host.docker.internal:8080
+      - Gate__Services__reports=http://host.docker.internal:8081
+      - Gate__Services__analysis=http://host.docker.internal:8082
+      - Gate__Services__middleware=http://host.docker.internal:3000
+      - Redis__ConnectionString=redis:6379
+      - Jwt__Authority=https://host.docker.internal:5001
+      - Jwt__Audience=accessibility-gateway
+    depends_on:
+      - redis-dev
+    volumes:
+      - ./src:/src
+      - gateway-dev-logs:/app/logs
+    networks:
+      - accessibility-dev-network
+    restart: unless-stopped
+    command: ["dotnet", "watch", "run", "--urls", "http://+:8080"]
+
+  redis-dev:
+    image: redis:7.2-alpine
+    container_name: accessibility-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    networks:
+      - accessibility-dev-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  gateway-dev-logs:
+    driver: local
+  redis-dev-data:
+    driver: local
+
+networks:
+  accessibility-dev-network:
+    driver: bridge
+    name: accessibility-dev-network
