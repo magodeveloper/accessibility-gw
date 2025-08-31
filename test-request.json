@@ -1,0 +1,5 @@
+{
+  "service": "users",
+  "method": "GET",
+  "path": "/api/v1/users"
+}

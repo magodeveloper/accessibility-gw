@@ -1,0 +1,210 @@
+using FluentAssertions;
+using System.Net;
+using System.Text.Json;
+using Xunit;
+
+namespace Gateway.IntegrationTests;
+
+/// <summary>
+/// Tests de integración para Health Checks del Gateway
+/// </summary>
+[Trait("Category", "Integration")]
+public class HealthCheckIntegrationTests : IClassFixture<GatewayTestFactory>
+{
+    private readonly GatewayTestFactory _factory;
+    private readonly HttpClient _client;
+
+    public HealthCheckIntegrationTests(GatewayTestFactory factory)
+    {
+        _factory = factory;
+        _client = _factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task HealthCheck_ShouldReturnHealthy_WhenAllServicesAreRunning()
+    {
+        // Act
+        var response = await _client.GetAsync("/health");
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        content.Should().NotBeNullOrEmpty();
+
+        var healthData = JsonSerializer.Deserialize<JsonElement>(content);
+        healthData.GetProperty("Status").GetString().Should().Be("Healthy");
+    }
+
+    [Fact]
+    public async Task LivenessCheck_ShouldReturnHealthy()
+    {
+        // Act
+        var response = await _client.GetAsync("/health/live");
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var healthData = JsonSerializer.Deserialize<JsonElement>(content);
+        healthData.GetProperty("status").GetString().Should().Be("healthy");
+        healthData.TryGetProperty("timestamp", out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReadinessCheck_ShouldReturnReady_WhenAllDependenciesAreHealthy()
+    {
+        // Arrange - Verificar que los mock servers estén funcionando
+        var mockServersHealthy = await _factory.VerifyMockServersAsync();
+        mockServersHealthy.Should().BeTrue("Mock servers should be running for this test");
+
+        // Act
+        var response = await _client.GetAsync("/health/ready");
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var healthData = JsonSerializer.Deserialize<JsonElement>(content);
+        healthData.GetProperty("status").GetString().Should().Be("ready");
+    }
+
+    [Fact]
+    public async Task HealthCheck_WithDeepParameter_ShouldIncludeAllChecks()
+    {
+        // Act
+        var response = await _client.GetAsync("/health?deep=true");
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var healthData = JsonSerializer.Deserialize<JsonElement>(content);
+        healthData.GetProperty("Status").GetString().Should().Be("Healthy");
+
+        // Debe incluir información detallada de servicios
+        healthData.TryGetProperty("Services", out var services).Should().BeTrue();
+        services.ValueKind.Should().Be(JsonValueKind.Object);
+    }
+
+    [Fact]
+    public async Task HealthCheck_WithMetricsParameter_ShouldIncludeMetrics()
+    {
+        // Act
+        var response = await _client.GetAsync("/health?includeMetrics=true");
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var healthData = JsonSerializer.Deserialize<JsonElement>(content);
+        healthData.GetProperty("Status").GetString().Should().Be("Healthy");
+
+        // Debe incluir métricas
+        healthData.TryGetProperty("Metrics", out var metrics).Should().BeTrue();
+        metrics.ValueKind.Should().Be(JsonValueKind.Object);
+    }
+
+    [Fact]
+    public async Task HealthCheck_ShouldHaveCorrectResponseStructure()
+    {
+        // Act
+        var response = await _client.GetAsync("/health");
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+
+        var healthData = JsonSerializer.Deserialize<JsonElement>(content);
+
+        // Verificar estructura requerida
+        healthData.TryGetProperty("Status", out _).Should().BeTrue("Should have Status property");
+        healthData.TryGetProperty("TotalDuration", out _).Should().BeTrue("Should have TotalDuration property");
+        healthData.TryGetProperty("Services", out _).Should().BeTrue("Should have Services property");
+    }
+
+    [Fact]
+    public async Task HealthCheck_ShouldBeCached()
+    {
+        // Act - Primera llamada
+        var response1 = await _client.GetAsync("/health");
+        var content1 = await response1.Content.ReadAsStringAsync();
+
+        // Act - Segunda llamada inmediata
+        var response2 = await _client.GetAsync("/health");
+        var content2 = await response2.Content.ReadAsStringAsync();
+
+        // Assert
+        response1.StatusCode.Should().Be(HttpStatusCode.OK);
+        response2.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // El contenido debería ser el mismo (cacheado)
+        content1.Should().Be(content2);
+
+        // Verificar headers de cache
+        response2.Headers.Should().ContainKey("cache-control");
+    }
+
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/health/live")]
+    [InlineData("/health/ready")]
+    public async Task HealthEndpoints_ShouldAllReturnValidJson(string endpoint)
+    {
+        // Act
+        var response = await _client.GetAsync(endpoint);
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        content.Should().NotBeNullOrEmpty();
+
+        // Verificar que es JSON válido
+        var action = () => JsonSerializer.Deserialize<JsonElement>(content);
+        action.Should().NotThrow("Response should be valid JSON");
+    }
+
+    [Fact]
+    public async Task HealthCheck_ShouldHandleConcurrentRequests()
+    {
+        // Arrange
+        var tasks = new List<Task<HttpResponseMessage>>();
+
+        // Act - Hacer múltiples requests concurrentes
+        for (int i = 0; i < 10; i++)
+        {
+            tasks.Add(_client.GetAsync("/health"));
+        }
+
+        var responses = await Task.WhenAll(tasks);
+
+        // Assert
+        responses.Should().HaveCount(10);
+        responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK);
+
+        // Verificar que todas las respuestas son válidas
+        foreach (var response in responses)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            content.Should().NotBeNullOrEmpty();
+
+            var healthData = JsonSerializer.Deserialize<JsonElement>(content);
+            healthData.GetProperty("Status").GetString().Should().Be("Healthy");
+        }
+    }
+
+    [Fact]
+    public async Task HealthCheck_ShouldHaveReasonableResponseTime()
+    {
+        // Arrange
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // Act
+        var response = await _client.GetAsync("/health");
+        stopwatch.Stop();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        stopwatch.ElapsedMilliseconds.Should().BeLessThan(5000, "Health check should respond within 5 seconds");
+    }
+}

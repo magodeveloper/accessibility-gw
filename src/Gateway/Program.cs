@@ -1,17 +1,21 @@
-using System.Net;
-using System.Net.Http.Headers;
+using Polly;
+using Serilog;
 using Gateway;
+using System.Net;
 using Gateway.Models;
 using Gateway.Services;
-using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Options;
-using Polly;
-using Polly.Extensions.Http;
-using Serilog;
-using Yarp.ReverseProxy.Forwarder;
-using Microsoft.OpenApi.Models;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text.Json;
+using Polly.Extensions.Http;
+using System.Net.Http.Headers;
+using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using Yarp.ReverseProxy.Forwarder;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.RateLimiting;
+using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +23,7 @@ var builder = WebApplication.CreateBuilder(args);
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
-    .Enrich.WithMachineName()
-    .Enrich.WithThreadId()
+    .Enrich.WithProperty("MachineName", Environment.MachineName)
     .WriteTo.Console()
     .WriteTo.File("./logs/gateway-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 7)
     .CreateLogger();
@@ -113,8 +116,8 @@ builder.Services.AddSwaggerGen(c =>
         c.IncludeXmlComments(xmlPath);
     }
 
-    // Configurar tags para mejor organización
-    c.EnableAnnotations();
+    // Configurar tags para mejor organización  
+    // c.EnableAnnotations(); // Comentado temporalmente
     c.DocInclusionPredicate((name, api) => true);
 });
 
@@ -182,7 +185,7 @@ else
 {
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<Microsoft.Extensions.Caching.Distributed.IDistributedCache,
-        Microsoft.Extensions.Caching.Memory.MemoryDistributedCache>();
+    Microsoft.Extensions.Caching.Distributed.MemoryDistributedCache>();
 }
 
 // --- Output Cache ---
@@ -193,53 +196,30 @@ builder.Services.AddOutputCache(o =>
 });
 
 // --- HttpClient con políticas de resiliencia ---
-static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
-    HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .OrResult(r => (int)r.StatusCode == (int)HttpStatusCode.TooManyRequests)
-        .WaitAndRetryAsync(
-            retryCount: 3,
-            sleepDurationProvider: retry => TimeSpan.FromMilliseconds(200 * Math.Pow(2, retry)),
-            onRetry: (outcome, timespan, retryCount, context) =>
-            {
-                Log.Warning("Retry {RetryCount} for {Url} in {Delay}ms", retryCount, context.OperationKey, timespan.TotalMilliseconds);
-            });
-
-static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
-    HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .CircuitBreakerAsync(
-            handledEventsAllowedBeforeBreaking: 5,
-            durationOfBreak: TimeSpan.FromSeconds(30),
-            onBreak: (exception, duration) =>
-            {
-                Log.Warning("Circuit breaker opened for {Duration}s", duration.TotalSeconds);
-            },
-            onReset: () =>
-            {
-                Log.Information("Circuit breaker reset");
-            });
+// Nota: Las políticas de reintentos y circuit breaker están comentadas temporalmente
+// hasta que se resuelvan las dependencias de Polly
 
 builder.Services.AddHttpClient();
-builder.Services.AddSingleton<IHttpForwarder, HttpForwarder>();
-builder.Services.AddHttpMessageInvoker(sp =>
+builder.Services.AddHttpForwarder();
+builder.Services.AddHttpClient("DefaultClient", (sp, client) =>
 {
     var gateOptions = sp.GetRequiredService<IOptions<GateOptions>>().Value;
-    return new HttpClient(new SocketsHttpHandler
-    {
-        AllowAutoRedirect = false,
-        AutomaticDecompression = DecompressionMethods.All,
-        UseProxy = false
-    })
-    {
-        Timeout = TimeSpan.FromSeconds(gateOptions.DefaultTimeoutSeconds)
-    };
+    client.Timeout = TimeSpan.FromSeconds(gateOptions.DefaultTimeoutSeconds);
 })
-.ConfigurePrimaryHttpMessageHandler(_ => new SocketsHttpHandler())
-.AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetCircuitBreakerPolicy());
+.ConfigurePrimaryHttpMessageHandler(_ => new SocketsHttpHandler());
+//.AddPolicyHandler(GetRetryPolicy())
+//.AddPolicyHandler(GetCircuitBreakerPolicy());
 
 // --- Servicios personalizados ---
+builder.Services.AddSingleton<HttpMessageInvoker>(provider =>
+{
+    var gateOptions = provider.GetRequiredService<IOptions<GateOptions>>().Value;
+    var handler = new SocketsHttpHandler
+    {
+        ConnectTimeout = TimeSpan.FromSeconds(gateOptions.DefaultTimeoutSeconds)
+    };
+    return new HttpMessageInvoker(handler);
+});
 builder.Services.AddSingleton<RequestTranslator>();
 builder.Services.AddSingleton<CacheService>();
 builder.Services.AddSingleton<MetricsService>();
@@ -257,9 +237,8 @@ if (gateConfig?.Services != null)
 {
     foreach (var service in gateConfig.Services)
     {
-        healthChecksBuilder.AddTypeActivatedCheck<ServiceHealthCheck>(
+        healthChecksBuilder.AddCheck<ServiceHealthCheck>(
             $"service-{service.Key}",
-            args: new object[] { service.Key, service.Value },
             tags: new[] { "ready", service.Key });
     }
 }
@@ -312,7 +291,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Accessibility Gateway API v1");
-        c.RoutePrefix = string.Empty; // Swagger UI en la raíz
+        c.RoutePrefix = "swagger"; // Swagger UI en /swagger
         c.DisplayRequestDuration();
         c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
         c.EnableFilter();
@@ -320,8 +299,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHsts();
-app.UseHttpsRedirection();
+// Comentado para desarrollo local sin HTTPS
+// app.UseHsts();
+// app.UseHttpsRedirection();
 app.UseCors("AllowedOrigins");
 
 if (!string.IsNullOrWhiteSpace(authority))
@@ -332,6 +312,96 @@ if (!string.IsNullOrWhiteSpace(authority))
 
 app.UseRateLimiter();
 app.UseOutputCache();
+
+// Middleware para enrutamiento automático de API
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value;
+    var method = context.Request.Method;
+
+    Console.WriteLine($"=== MIDDLEWARE DEBUG === {method} {path}");
+
+    // Solo manejar rutas que empiecen con /api/ y no sean rutas internas del gateway
+    if (path?.StartsWith("/api/") == true &&
+        !path.StartsWith("/api/v1/translate") &&
+        !path.StartsWith("/api/v1/services/"))
+    {
+        Console.WriteLine($"=== INTERCEPTED API REQUEST === {method} {path}");
+
+        var translator = context.RequestServices.GetService<RequestTranslator>();
+        if (translator != null)
+        {
+            Console.WriteLine("=== TRANSLATOR SERVICE OBTAINED ===");
+
+            // Intentar mapear la ruta a un servicio conocido
+            string? targetService = null;
+
+            if (path.StartsWith("/api/v1/users") || path.StartsWith("/api/auth"))
+                targetService = "users";
+            else if (path.StartsWith("/api/Report"))
+                targetService = "reports";
+            else if (path.StartsWith("/api/Analysis"))
+                targetService = "analysis";
+            else if (path.StartsWith("/api/analyze"))
+                targetService = "middleware";
+
+            Console.WriteLine($"=== MAPPED TO SERVICE === {targetService ?? "null"}");
+
+            if (targetService != null)
+            {
+                var translateRequest = new TranslateRequest
+                {
+                    Service = targetService,
+                    Method = method,
+                    Path = path,
+                    Query = context.Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString()),
+                    Headers = context.Request.Headers
+                        .Where(h => !h.Key.StartsWith(":"))
+                        .ToDictionary(h => h.Key, h => h.Value.ToString())
+                };
+
+                Console.WriteLine($"=== TRANSLATE REQUEST CREATED === {translateRequest.Service}:{translateRequest.Method}:{translateRequest.Path}");
+
+                if (translator.IsAllowed(translateRequest))
+                {
+                    Console.WriteLine("=== REQUEST ALLOWED BY ACL ===");
+                    try
+                    {
+                        // Usar ForwardAsync en lugar de ProcessRequestAsync
+                        // ForwardAsync maneja tanto errores como respuestas exitosas
+                        Console.WriteLine("=== CALLING FORWARDASYNC ===");
+                        await translator.ForwardAsync(context, translateRequest, context.RequestAborted);
+                        Console.WriteLine("=== FORWARDASYNC COMPLETED ===");
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"=== EXCEPTION IN FORWARDASYNC === {ex.Message}");
+                        context.Response.StatusCode = 500;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync($"{{\"error\":\"Gateway error: {ex.Message}\"}}", context.RequestAborted);
+                        return;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"=== REQUEST NOT ALLOWED BY ACL === {targetService}:{method}:{path}");
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine("=== TRANSLATOR SERVICE IS NULL ===");
+        }
+    }
+    else
+    {
+        Console.WriteLine($"=== REQUEST BYPASSED === {method} {path}");
+    }
+
+    Console.WriteLine("=== CALLING NEXT MIDDLEWARE ===");
+    await next();
+});
 
 // --- Endpoints de la API ---
 
@@ -400,14 +470,14 @@ app.MapMethods("/api/v1/services/{service}/{**path}",
 .RequireRateLimiting("public");
 
 // --- Health Checks ---
-app.MapGet("/health", async (HealthCheckRequest? req, IServiceProvider sp) =>
+app.MapGet("/health", async ([FromServices] IServiceProvider sp, [FromQuery] bool deep = false, [FromQuery] bool includeMetrics = false) =>
 {
     var healthCheckService = sp.GetRequiredService<HealthCheckService>();
     var metricsService = sp.GetRequiredService<MetricsService>();
 
     var options = new HealthCheckOptions
     {
-        Predicate = req?.Deep == true ? _ => true : check => check.Tags.Contains("live")
+        Predicate = deep ? _ => true : check => check.Tags.Contains("live")
     };
 
     var result = await healthCheckService.CheckHealthAsync(options.Predicate);
@@ -428,7 +498,7 @@ app.MapGet("/health", async (HealthCheckRequest? req, IServiceProvider sp) =>
         )
     };
 
-    if (req?.IncludeMetrics == true)
+    if (includeMetrics)
     {
         response = response with { Metrics = metricsService.GetMetrics() };
     }

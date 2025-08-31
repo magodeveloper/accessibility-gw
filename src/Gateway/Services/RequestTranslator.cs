@@ -2,11 +2,13 @@ using System.Net;
 using System.Text;
 using Gateway.Models;
 using System.Text.Json;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using Yarp.ReverseProxy.Forwarder;
+using Yarp.ReverseProxy.Transforms;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Http.Extensions;
-using System.Diagnostics;
 
 namespace Gateway.Services;
 
@@ -124,10 +126,13 @@ public sealed class RequestTranslator
 
             if (result.Response != null)
             {
-                result.Response = result.Response with
+                result = result with
                 {
-                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                    ProcessedByService = req.Service
+                    Response = result.Response with
+                    {
+                        ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                        ProcessedByService = req.Service
+                    }
                 };
             }
 
@@ -155,25 +160,55 @@ public sealed class RequestTranslator
 
     public async Task ForwardAsync(HttpContext context, TranslateRequest req, CancellationToken ct)
     {
-        var result = await ProcessRequestAsync(context, req, ct);
+        using var activity = _metricsService.StartActivity("gateway.forward", req.Service, req.Method, req.Path);
+        var stopwatch = Stopwatch.StartNew();
 
-        if (result.Error != null)
+        try
         {
-            context.Response.StatusCode = result.Error.StatusCode ?? 500;
-            context.Response.ContentType = "application/json";
+            _logger.LogInformation("Forwarding request {Service}:{Method}:{Path}", req.Service, req.Method, req.Path);
 
-            if (result.Error.Headers != null)
+            // Llamar directamente al método que maneja YARP
+            var result = await ForwardRequestAsync(context, req, ct);
+
+            stopwatch.Stop();
+
+            if (result.Error != null)
             {
-                foreach (var header in result.Error.Headers)
-                {
-                    context.Response.Headers[header.Key] = header.Value;
-                }
-            }
+                context.Response.StatusCode = result.Error.StatusCode ?? 500;
+                context.Response.ContentType = "application/json";
 
-            var errorResponse = new { error = result.Error };
-            await context.Response.WriteAsync(JsonSerializer.Serialize(errorResponse, _json), ct);
+                if (result.Error.Headers != null)
+                {
+                    foreach (var header in result.Error.Headers)
+                    {
+                        context.Response.Headers[header.Key] = header.Value;
+                    }
+                }
+
+                var errorResponse = new { error = result.Error };
+                await context.Response.WriteAsync(JsonSerializer.Serialize(errorResponse, _json), ct);
+
+                _metricsService.RecordRequest(req.Service, req.Method, result.Error.StatusCode ?? 500, stopwatch.Elapsed.TotalMilliseconds);
+            }
+            else
+            {
+                // La respuesta exitosa ya fue escrita por YARP
+                _logger.LogInformation("Request forwarded successfully {Service}:{Method}:{Path}", req.Service, req.Method, req.Path);
+                _metricsService.RecordRequest(req.Service, req.Method, context.Response.StatusCode, stopwatch.Elapsed.TotalMilliseconds);
+            }
         }
-        // Si es exitoso, YARP ya escribió la respuesta
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "Error forwarding request {Service}:{Method}:{Path}", req.Service, req.Method, req.Path);
+
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
+            var errorResponse = new { error = new { message = "Gateway forwarding error", details = ex.Message } };
+            await context.Response.WriteAsync(JsonSerializer.Serialize(errorResponse, _json), ct);
+
+            _metricsService.RecordRequest(req.Service, req.Method, 500, stopwatch.Elapsed.TotalMilliseconds);
+        }
     }
 
     private async Task<TranslateResult> ForwardRequestAsync(HttpContext context, TranslateRequest req, CancellationToken ct)
@@ -181,7 +216,21 @@ public sealed class RequestTranslator
         var baseUrl = _opts.Services[req.Service].TrimEnd('/');
         var targetUri = new Uri(BuildTargetUrl(baseUrl, req.Path, req.Query));
 
-        var transformer = HttpTransformer.Default;
+        Console.WriteLine($"=== FORWARD REQUEST DEBUG ===");
+        Console.WriteLine($"Service: {req.Service}");
+        Console.WriteLine($"BaseURL: {baseUrl}");
+        Console.WriteLine($"Path: {req.Path}");
+        Console.WriteLine($"TargetURI: {targetUri}");
+
+        // Crear un transformer personalizado para preservar el header Host
+        // Extraer el host de la URL del servicio desde la configuración
+        var actualServiceUrl = new Uri(_opts.Services[req.Service]);
+        var actualExpectedHost = actualServiceUrl.Authority;
+
+        Console.WriteLine($"=== SERVICE URL === {_opts.Services[req.Service]}");
+        Console.WriteLine($"=== EXPECTED HOST === {actualExpectedHost}");
+
+        var transformer = new CustomHostTransformer(actualExpectedHost, targetUri.ToString());
         var act = req.Method.ToUpperInvariant();
 
         // Limpiar headers conflictivos
@@ -228,14 +277,22 @@ public sealed class RequestTranslator
             ActivityTimeout = TimeSpan.FromSeconds(_opts.DefaultTimeoutSeconds)
         };
 
-        var error = await _forwarder.SendAsync(context, targetUri, _httpClient, requestConfig, transformer);
+        Console.WriteLine($"=== CALLING YARP FORWARDER ===");
+        Console.WriteLine($"TargetURI: {targetUri}");
+
+        var error = await _forwarder.SendAsync(context, targetUri.ToString(), _httpClient, requestConfig, transformer);
+
+        Console.WriteLine($"=== YARP FORWARDER RESULT ===");
+        Console.WriteLine($"Error: {error}");
+        Console.WriteLine($"Response StatusCode: {context.Response.StatusCode}");
+        Console.WriteLine($"Response Headers: {string.Join(", ", context.Response.Headers.Select(h => $"{h.Key}:{h.Value}"))}");
 
         if (error != ForwarderError.None)
         {
             var status = error switch
             {
                 ForwarderError.Request => HttpStatusCode.BadRequest,
-                ForwarderError.Timeout or ForwarderError.RequestTimedOut => HttpStatusCode.GatewayTimeout,
+                ForwarderError.RequestTimedOut => HttpStatusCode.GatewayTimeout,
                 ForwarderError.NoAvailableDestinations => HttpStatusCode.BadGateway,
                 _ => HttpStatusCode.BadGateway
             };
@@ -291,5 +348,33 @@ public sealed class RequestTranslator
         };
 
         return forbiddenHeaders.Contains(headerName.ToLowerInvariant());
+    }
+}
+
+public class CustomHostTransformer : HttpTransformer
+{
+    private readonly string _expectedHost;
+    private readonly string _targetUri;
+
+    public CustomHostTransformer(string expectedHost, string targetUri)
+    {
+        _expectedHost = expectedHost;
+        _targetUri = targetUri;
+    }
+
+    public override async ValueTask TransformRequestAsync(HttpContext httpContext, HttpRequestMessage proxyRequest, string destinationPrefix, CancellationToken cancellationToken)
+    {
+        await base.TransformRequestAsync(httpContext, proxyRequest, destinationPrefix, cancellationToken);
+
+        // Forzar el header Host correcto
+        proxyRequest.Headers.Host = _expectedHost;
+
+        // Establecer la URI de destino manualmente
+        proxyRequest.RequestUri = new Uri(_targetUri);
+
+        Console.WriteLine($"=== CUSTOM TRANSFORMER SET HOST === {_expectedHost}");
+        Console.WriteLine($"=== PROXY REQUEST URI === {proxyRequest.RequestUri}");
+        Console.WriteLine($"=== PROXY REQUEST METHOD === {proxyRequest.Method}");
+        Console.WriteLine($"=== PROXY REQUEST HEADERS === {string.Join(", ", proxyRequest.Headers.Select(h => $"{h.Key}:{string.Join(",", h.Value)}"))}");
     }
 }

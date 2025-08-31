@@ -1,54 +1,121 @@
-version: '3.8'
-
 services:
   accessibility-gateway-dev:
     build:
-      context: ./src
+      context: .
       dockerfile: Dockerfile
-      target: build  # Usar la etapa de build para desarrollo
+      args:
+        BUILD_CONFIGURATION: Debug
+    image: accessibility-gateway:dev
     container_name: accessibility-gw-dev
     ports:
-      - "8000:8080"
-      - "8001:8081"
+      - '8101:8080'  # Puerto diferente para desarrollo
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - Gate__Services__users=http://host.docker.internal:8080
-      - Gate__Services__reports=http://host.docker.internal:8081
-      - Gate__Services__analysis=http://host.docker.internal:8082
-      - Gate__Services__middleware=http://host.docker.internal:3000
-      - Redis__ConnectionString=redis:6379
-      - Jwt__Authority=https://host.docker.internal:5001
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - Gate__Services__users=http://msusers-api:8081
+      - Gate__Services__reports=http://msreports-api:8083
+      - Gate__Services__analysis=http://msanalysis-api:8082
+      - Gate__Services__middleware=http://accessibility-mw-prod:3001
+      - Redis__ConnectionString=accessibility-redis-dev:6379
+      - Jwt__Authority=https://localhost:8100
       - Jwt__Audience=accessibility-gateway
+      - Gate__DefaultTimeoutSeconds=30
+      - Gate__EnableDetailedErrors=true
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__Microsoft=Warning
+      - Logging__LogLevel__System=Warning
     depends_on:
-      - redis-dev
+      redis-dev:
+        condition: service_healthy
     volumes:
-      - ./src:/src
       - gateway-dev-logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
     networks:
-      - accessibility-dev-network
+      - accessibility-shared
     restart: unless-stopped
-    command: ["dotnet", "watch", "run", "--urls", "http://+:8080"]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:8080/health/live || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   redis-dev:
     image: redis:7.2-alpine
     container_name: accessibility-redis-dev
     ports:
-      - "6379:6379"
+      - '6380:6379'  # Puerto diferente para evitar conflictos
     volumes:
       - redis-dev-data:/data
+      - /etc/localtime:/etc/localtime:ro
     networks:
-      - accessibility-dev-network
+      - accessibility-shared
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: |
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec 
+      --maxmemory 128mb 
+      --maxmemory-policy allkeys-lru 
+      --tcp-keepalive 60 
+      --timeout 0 
+      --loglevel verbose
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+
+  # Servicio opcional para monitoreo en desarrollo
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander-dev
+    ports:
+      - '8082:8081'
+    environment:
+      - REDIS_HOSTS=dev:accessibility-redis-dev:6379
+    depends_on:
+      redis-dev:
+        condition: service_healthy
+    networks:
+      - accessibility-shared
+    restart: unless-stopped
+    profiles:
+      - tools  # Solo se ejecuta con --profile tools
 
 volumes:
   gateway-dev-logs:
     driver: local
+    name: accessibility-gateway-dev-logs
   redis-dev-data:
     driver: local
+    name: accessibility-redis-dev-data
 
 networks:
-  accessibility-dev-network:
-    driver: bridge
-    name: accessibility-dev-network
+  accessibility-shared:
+    external: true
+    name: accessibility-shared

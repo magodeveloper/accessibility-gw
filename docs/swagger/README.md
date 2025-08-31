@@ -1,212 +1,330 @@
-# 📚 Documentación API Gateway - Plataforma de Accesibilidad
+# 📖 Documentación OpenAPI Completa - Accessibility Platform
 
-Este directorio contiene la documentación completa de la API del Gateway de Accesibilidad, incluyendo todos los endpoints de los microservicios integrados.
+Este directorio contiene la documentación OpenAPI completa para el **Accessibility Platform API Gateway**, proporcionando una especificación detallada de todos los endpoints, schemas y casos de uso.
 
-## 📋 Archivos Incluidos
+## 📁 Estructura de Archivos
 
-### `gateway-complete-api.yaml`
-
-Especificación OpenAPI 3.0.3 completa que incluye:
-
-- ✅ **Gateway Principal**: Endpoints de traducción y enrutamiento
-- ✅ **Microservicio Users**: Autenticación, usuarios y preferencias
-- ✅ **Microservicio Reports**: Generación y gestión de reportes
-- ✅ **Microservicio Analysis**: Motor de análisis de accesibilidad
-- ✅ **Middleware API**: Herramientas avanzadas de análisis (axe-core, Equal Access)
-- ✅ **Endpoints de Monitoreo**: Health checks, métricas y gestión de caché
-
-### `index.html`
-
-Página de documentación interactiva que incluye:
-
-- 🚀 **Guía de inicio rápido**
-- 📊 **Vista general de servicios**
-- 🔧 **Interfaz Swagger interactiva**
-- 🧪 **Capacidad de testing con JWT tokens**
-
-## 🌐 Servicios Documentados
-
-### 1. Gateway Principal (`/api/v1/`)
-
-- **Traducción de peticiones**: `POST /api/v1/translate`
-- **Enrutamiento directo**: `GET|POST|PUT|DELETE /api/v1/services/{service}/{path}`
-- **Monitoreo**: Health checks y métricas en tiempo real
-
-### 2. Users & Authentication (`/api/v1/auth/`, `/api/v1/users/`)
-
-- **Autenticación JWT**: Login, logout, registro
-- **Gestión de usuarios**: CRUD completo con paginación
-- **Preferencias**: Configuración personalizada por usuario
-
-### 3. Reports (`/api/report/`)
-
-- **Gestión de reportes**: Creación, actualización, eliminación
-- **Historial**: Tracking de cambios y versiones
-- **Filtros**: Por usuario, análisis y fechas
-
-### 4. Analysis (`/api/analysis/`)
-
-- **Motor de análisis**: Múltiples niveles WCAG (A, AA, AAA)
-- **Resultados detallados**: Violaciones, advertencias y recomendaciones
-- **Gestión de errores**: Tracking y resolución de problemas
-
-### 5. Accessibility Tools (`/api/analyze/`)
-
-- **Análisis de URLs**: Herramientas axe-core y Equal Access
-- **Análisis de HTML**: Contenido directo
-- **Análisis en lote**: Múltiples URLs en paralelo
-- **Configuración avanzada**: Timeouts, viewports, screenshots
-
-### 6. Monitoring (`/health/`, `/metrics/`)
-
-- **Health Checks**: Liveness y readiness probes (Kubernetes)
-- **Métricas**: Estadísticas detalladas de uso y rendimiento
-- **Gestión de caché**: Invalidación por servicio
-
-## 🚀 Cómo Usar la Documentación
-
-### 1. **Explorar Localmente**
-
-```bash
-# Desde el directorio del gateway
-cd docs/swagger
-python -m http.server 8080
-
-# Abrir en el navegador
-open http://localhost:8080
+```
+docs/swagger/
+├── README.md                          # Este archivo
+├── index.html                         # Interfaz Swagger UI interactiva
+├── gateway-complete-api.yaml          # Especificación OpenAPI principal
+├── gateway-microservices-extension.yaml # Documentación de microservicios
+└── openapi-examples.yaml             # Ejemplos y casos de uso avanzados
 ```
 
-### 2. **Integrar con el Gateway**
+## 🚀 Acceso Rápido
 
-La documentación se sirve automáticamente desde el gateway en:
+### Documentación Interactiva
 
-- **Swagger UI**: `http://localhost:8000/swagger`
-- **OpenAPI JSON**: `http://localhost:8000/swagger/v1/swagger.json`
+Abre `index.html` en tu navegador para acceder a la documentación interactiva completa con:
 
-### 3. **Testing con JWT**
+- **Interfaz Swagger UI** moderna y responsiva
+- **Autenticación JWT** integrada
+- **Ejemplos de código** en múltiples lenguajes
+- **Pruebas en vivo** de todos los endpoints
 
-1. Hacer login: `POST /api/v1/auth/login`
-2. Copiar el JWT token de la respuesta
-3. En la interfaz Swagger, hacer clic en "🔑 Configurar JWT Token"
-4. Pegar el token
-5. Probar endpoints autenticados
+### URLs de Acceso
 
-## 🔧 Configuración de Desarrollo
+- **Local**: `file:///c:/Git/accessibility-gw/docs/swagger/index.html`
+- **Servidor local**: `http://localhost:8000/docs/swagger/`
+- **Producción**: `https://api.accessibility.company.com/docs/`
+
+## 🔧 Configuración
 
 ### Prerrequisitos
 
-- ✅ Gateway ejecutándose en `http://localhost:8000`
-- ✅ Todos los microservicios disponibles
-- ✅ Redis configurado para caché
-- ✅ Base de datos de usuarios inicializada
+- Navegador web moderno (Chrome, Firefox, Safari, Edge)
+- Conexión a internet (para cargar recursos de Swagger UI)
+- Token JWT válido para probar endpoints protegidos
 
-### Variables de Entorno
+### Servidor Local
+
+Para servir la documentación localmente:
 
 ```bash
-# Gateway
-GATEWAY_PORT=8000
-REDIS_CONNECTION_STRING="localhost:6379"
+# Navegar al directorio del gateway
+cd c:\Git\accessibility-gw
 
-# Servicios
-USERS_SERVICE_URL="http://localhost:5001"
-REPORTS_SERVICE_URL="http://localhost:5002"
-ANALYSIS_SERVICE_URL="http://localhost:5003"
-MIDDLEWARE_SERVICE_URL="http://localhost:3000"
+# Servir archivos estáticos (Python)
+python -m http.server 8000
 
-# JWT
-JWT_AUTHORITY="https://your-auth-server"
-JWT_AUDIENCE="accessibility-api"
+# O usando Node.js
+npx http-server -p 8000
+
+# O usando PowerShell (Windows)
+# Instalar IIS Express o usar VS Code Live Server
 ```
 
-## 📝 Ejemplos de Uso
+## 📋 Contenido de la Documentación
 
-### Autenticación
+### 🌐 Gateway Principal (`gateway-complete-api.yaml`)
+
+- **Endpoint translate**: `/api/v1/translate` - Enrutamiento a microservicios
+- **Endpoints directos**: `/api/v1/services/{service}/{path}` - Llamadas directas
+- **Health checks**: `/health`, `/health/live`, `/health/ready`
+- **Métricas**: `/metrics` - Información de rendimiento
+- **Esquemas base**: TranslateRequest, HealthCheck, Metrics
+
+### 🔧 Microservicios (`gateway-microservices-extension.yaml`)
+
+#### Users Service
+
+- **Autenticación**: Login, registro, refresh token, logout
+- **Gestión usuarios**: CRUD completo con paginación y filtros
+- **Preferencias**: Configuración personalizada por usuario
+
+#### Reports Service
+
+- **Gestión reportes**: Crear, listar, actualizar, eliminar
+- **Descarga**: PDF, HTML, JSON formats
+- **Estados**: Draft, InProgress, Completed, Failed
+
+#### Analysis Service
+
+- **Análisis estándar**: Crear, consultar, reintentar
+- **Filtros avanzados**: Por estado, nivel WCAG, puntuación
+- **Rate limiting**: 20 req/min para operaciones intensivas
+
+#### Middleware Service
+
+- **Análisis avanzado**: URL y HTML directo
+- **Herramientas múltiples**: Axe, Equal Access
+- **Configuración flexible**: WCAG A/AA/AAA, viewport, timeout
+- **Monitoreo progreso**: Estados en tiempo real
+
+### 📚 Ejemplos Avanzados (`openapi-examples.yaml`)
+
+- **Flujos completos**: Registro → Login → Análisis → Reporte
+- **Análisis batch**: Múltiples URLs simultáneas
+- **Gestión administrativa**: Operaciones con permisos elevados
+- **Integración CI/CD**: Ejemplos para pipelines automatizados
+- **SDKs**: Código ejemplo para JavaScript, Python, C#
+
+## 🔐 Autenticación
+
+### Flujo de Autenticación
+
+1. **Registrar usuario** (opcional): `POST /api/v1/translate` → users → `/api/v1/auth/register`
+2. **Iniciar sesión**: `POST /api/v1/translate` → users → `/api/v1/auth/login`
+3. **Obtener token JWT** de la respuesta
+4. **Configurar autorización** en Swagger UI: `Bearer <token>`
+5. **Usar endpoints protegidos** con el token configurado
+
+### Ejemplo de Autenticación
+
+```javascript
+// 1. Login
+const loginResponse = await fetch('/api/v1/translate', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    service: 'users',
+    method: 'POST',
+    path: '/api/v1/auth/login',
+    body: {
+      email: 'usuario@example.com',
+      password: 'password123',
+    },
+  }),
+});
+
+const { token } = await loginResponse.json();
+
+// 2. Usar token en peticiones subsecuentes
+const analysisResponse = await fetch('/api/v1/translate', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  },
+  body: JSON.stringify({
+    service: 'middleware',
+    method: 'POST',
+    path: '/api/v1/analyze/url',
+    body: {
+      url: 'https://example.com',
+      tools: ['axe', 'equalAccess'],
+      wcagLevel: 'AA',
+    },
+  }),
+});
+```
+
+## ⚡ Rate Limiting
+
+### Límites por Endpoint
+
+- **General**: 100 requests/minuto por IP
+- **Análisis**: 20 requests/minuto por IP
+- **Health/Metrics**: Sin límite
+
+### Headers de Rate Limit
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1640995200
+```
+
+## 🛠️ Casos de Uso Comunes
+
+### 1. Análisis Simple de URL
 
 ```bash
-# Login
-curl -X POST "http://localhost:8000/api/v1/auth/login" \
+curl -X POST "http://localhost:8000/api/v1/translate" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{
-    "email": "user@example.com",
-    "password": "password123"
+    "service": "middleware",
+    "method": "POST",
+    "path": "/api/v1/analyze/url",
+    "body": {
+      "url": "https://example.com",
+      "tools": ["axe"],
+      "wcagLevel": "AA"
+    }
   }'
 ```
 
-### Análisis de Accesibilidad
+### 2. Generar Reporte PDF
 
 ```bash
-# Analizar URL
-curl -X POST "http://localhost:8000/api/analyze/url" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+# 1. Crear análisis
+ANALYSIS_ID=$(curl -s -X POST "http://localhost:8000/api/v1/translate" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{
-    "url": "https://example.com",
-    "tools": ["axe", "equalAccess"],
-    "wcagLevel": "AA"
-  }'
+    "service": "analysis",
+    "method": "POST",
+    "path": "/api/v1/analysis",
+    "body": {
+      "url": "https://example.com",
+      "title": "Mi Análisis",
+      "wcagLevel": "AA"
+    }
+  }' | jq -r '.id')
+
+# 2. Crear reporte
+curl -X POST "http://localhost:8000/api/v1/translate" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d "{
+    \"service\": \"reports\",
+    \"method\": \"POST\",
+    \"path\": \"/api/v1/reports\",
+    \"body\": {
+      \"title\": \"Reporte de Accesibilidad\",
+      \"analysisId\": $ANALYSIS_ID
+    }
+  }"
 ```
 
-### Crear Reporte
+### 3. Monitoreo de Salud
 
 ```bash
-# Crear reporte
-curl -X POST "http://localhost:8000/api/report" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Reporte de Accesibilidad Web",
-    "analysisId": 123
-  }'
+# Health check básico
+curl http://localhost:8000/health
+
+# Health check completo con métricas
+curl "http://localhost:8000/health?deep=true&includeMetrics=true"
+
+# Métricas detalladas
+curl http://localhost:8000/metrics
 ```
 
-## 🔍 Rate Limiting
+## 🔍 Esquemas Principales
 
-La API implementa rate limiting por IP:
+### TranslateRequest
 
-- **General**: 100 requests/minuto
-- **Análisis**: 20 requests/minuto (endpoints `/api/analyze/*`)
+Modelo principal para el enrutamiento del gateway:
 
-## 🏷️ Versionado
+- `service`: users | reports | analysis | middleware
+- `method`: GET | POST | PUT | PATCH | DELETE
+- `path`: Ruta del endpoint en el microservicio
+- `query`: Parámetros de consulta (opcional)
+- `headers`: Headers personalizados (opcional)
+- `body`: Cuerpo de la petición (opcional)
+- `useCache`: Habilitar caché para GET (opcional)
 
-- **Versión actual**: `v1.0.0`
-- **Compatibilidad**: OpenAPI 3.0.3
-- **Formato de versionado**: Semantic Versioning (SemVer)
+### AnalysisResult
 
-## 🤝 Contribuir
+Respuesta completa de análisis con herramientas múltiples:
 
-Para agregar nuevos endpoints a la documentación:
+- `id`: Identificador único del análisis
+- `url`: URL analizada
+- `status`: completed | failed | pending
+- `tools`: Resultados de Axe y Equal Access
+- `summary`: Resumen con puntuación y estadísticas
+- `screenshot`: URL de captura de pantalla
 
-1. **Actualizar `gateway-complete-api.yaml`**:
+### HealthCheckResponse
 
-   ```yaml
-   /api/new-endpoint:
-     get:
-       tags: [Category]
-       summary: Description
-       # ... rest of specification
-   ```
+Estado de salud del sistema:
 
-2. **Agregar ejemplos en `index.html`** si es necesario
+- `status`: Healthy | Degraded | Unhealthy
+- `services`: Estado individual de cada servicio
+- `metrics`: Métricas de rendimiento (opcional)
 
-3. **Actualizar este README** con la nueva funcionalidad
+## 🚨 Manejo de Errores
+
+### Códigos de Estado HTTP
+
+- **200**: Operación exitosa
+- **201**: Recurso creado
+- **400**: Error de validación
+- **401**: No autorizado
+- **403**: Permisos insuficientes
+- **404**: Recurso no encontrado
+- **408**: Timeout
+- **413**: Payload demasiado grande
+- **429**: Rate limit excedido
+- **500**: Error interno del servidor
+- **502**: Error en microservicio de destino
+- **503**: Servicio no disponible
+
+### Estructura de Errores
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Los datos proporcionados no son válidos",
+    "details": [
+      {
+        "field": "email",
+        "message": "El formato del email no es válido",
+        "code": "INVALID_EMAIL_FORMAT"
+      }
+    ]
+  },
+  "timestamp": "2025-08-30T19:30:00Z"
+}
+```
 
 ## 📞 Soporte
 
-- **Documentación técnica**: Ver archivos YAML y HTML
-- **Issues**: Crear issue en el repositorio del proyecto
-- **Equipo**: accessibility@company.com
+### Contacto
+
+- **Email**: accessibility@company.com
+- **GitHub**: https://github.com/company/accessibility-platform
+- **Documentación**: https://docs.accessibility.company.com
+
+### Recursos Adicionales
+
+- **Guía de integración**: `/docs/integration/`
+- **SDKs oficiales**: `/docs/sdks/`
+- **Ejemplos de código**: `/docs/examples/`
+- **Changelog**: `/docs/changelog.md`
 
 ---
 
-### 🎯 Estado de Documentación
+## 🎯 Próximos Pasos
 
-| Servicio   | Endpoints | Esquemas | Ejemplos | Estado   |
-| ---------- | --------- | -------- | -------- | -------- |
-| Gateway    | ✅        | ✅       | ✅       | Completo |
-| Users      | ✅        | ✅       | ✅       | Completo |
-| Reports    | ✅        | ✅       | ✅       | Completo |
-| Analysis   | ✅        | ✅       | ✅       | Completo |
-| Middleware | ✅        | ✅       | ✅       | Completo |
-| Monitoring | ✅        | ✅       | ✅       | Completo |
+1. **Abrir** `index.html` en tu navegador
+2. **Probar** la autenticación con tus credenciales
+3. **Explorar** los endpoints disponibles
+4. **Experimentar** con los ejemplos de código
+5. **Integrar** en tu aplicación
 
-**📊 Total**: 50+ endpoints documentados | 25+ esquemas definidos | Rate limiting configurado | Autenticación JWT integrada
+¡La documentación está lista para usar! 🚀

@@ -81,3 +81,11 @@ health_check
 # IDE specific
 .vscode/
 .idea/
+
+# Environment files (contain sensitive data)
+.env
+.env.local
+.env.development
+.env.production
+.env.testing
+*.env

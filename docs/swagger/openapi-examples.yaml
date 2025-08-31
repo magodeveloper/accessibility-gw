@@ -1,0 +1,660 @@
+# =====================================================
+# EJEMPLOS Y SCHEMAS ADICIONALES PARA OPENAPI
+# =====================================================
+
+# ===== EJEMPLOS DE PETICIONES COMPLEJAS =====
+
+gateway_examples:
+  
+  # Ejemplo completo de análisis de accesibilidad
+  complete_accessibility_analysis:
+    summary: "Análisis completo de accesibilidad con múltiples herramientas"
+    description: |
+      Este ejemplo muestra cómo realizar un análisis completo de una página web
+      utilizando el endpoint translate del gateway para acceder al middleware.
+    value:
+      service: "middleware"
+      method: "POST"
+      path: "/api/v1/analyze/url"
+      headers:
+        "Content-Type": "application/json"
+        "X-Analysis-Priority": "high"
+      body:
+        url: "https://example.com/accessibility-test"
+        tools: ["axe", "equalAccess"]
+        wcagLevel: "AAA"
+        includeScreenshot: true
+        viewport:
+          width: 1920
+          height: 1080
+        timeout: 60000
+      useCache: false
+      cacheExpiration: 60
+
+  # Flujo completo de usuario: registro -> login -> análisis -> reporte
+  user_workflow_example:
+    summary: "Flujo completo de usuario desde registro hasta reporte"
+    description: |
+      Secuencia de llamadas para un flujo completo de usuario:
+      1. Registro de usuario
+      2. Inicio de sesión
+      3. Análisis de URL
+      4. Generación de reporte
+    steps:
+      step1_register:
+        description: "Registrar nuevo usuario"
+        request:
+          service: "users"
+          method: "POST"
+          path: "/api/v1/auth/register"
+          body:
+            nickname: "testuser"
+            name: "Test"
+            lastname: "User"
+            email: "testuser@example.com"
+            password: "SecurePass123!"
+      
+      step2_login:
+        description: "Iniciar sesión con el usuario creado"
+        request:
+          service: "users"
+          method: "POST"
+          path: "/api/v1/auth/login"
+          body:
+            email: "testuser@example.com"
+            password: "SecurePass123!"
+        response_use: "Guardar el token JWT para siguientes peticiones"
+      
+      step3_analyze:
+        description: "Realizar análisis de accesibilidad"
+        request:
+          service: "analysis"
+          method: "POST"
+          path: "/api/v1/analysis"
+          headers:
+            "Authorization": "Bearer {token_from_step2}"
+          body:
+            url: "https://example.com"
+            title: "Análisis de Homepage"
+            wcagLevel: "AA"
+            includeScreenshot: true
+        response_use: "Guardar el analysisId para el reporte"
+      
+      step4_create_report:
+        description: "Generar reporte basado en el análisis"
+        request:
+          service: "reports"
+          method: "POST"
+          path: "/api/v1/reports"
+          headers:
+            "Authorization": "Bearer {token_from_step2}"
+          body:
+            title: "Reporte de Accesibilidad - Homepage"
+            description: "Análisis completo de la página principal"
+            analysisId: "{analysisId_from_step3}"
+
+  # Ejemplo de gestión de usuarios administrativa
+  admin_user_management:
+    summary: "Gestión administrativa de usuarios"
+    description: |
+      Ejemplo de operaciones administrativas para gestión de usuarios.
+      Requiere permisos de Admin o SuperAdmin.
+    operations:
+      list_users:
+        service: "users"
+        method: "GET"
+        path: "/api/v1/users"
+        query:
+          page: "1"
+          limit: "20"
+          search: "admin"
+          role: "Admin"
+          status: "Active"
+        useCache: true
+        cacheExpiration: 10
+      
+      create_admin_user:
+        service: "users"
+        method: "POST"
+        path: "/api/v1/users"
+        body:
+          nickname: "admin2"
+          name: "Administrator"
+          lastname: "Secondary"
+          email: "admin2@company.com"
+          password: "AdminPass456!"
+          role: "Admin"
+      
+      update_user_preferences:
+        service: "users"
+        method: "PUT"
+        path: "/api/v1/users/123/preferences"
+        body:
+          theme: "dark"
+          language: "es"
+          notifications: true
+          accessibility:
+            highContrast: true
+            fontSize: "large"
+            reducedMotion: false
+
+  # Ejemplo de análisis batch con múltiples URLs
+  batch_analysis_example:
+    summary: "Análisis en lote de múltiples URLs"
+    description: |
+      Muestra cómo realizar análisis de múltiples URLs de forma eficiente
+      utilizando el middleware para análisis pesados.
+    batch_requests:
+      - service: "middleware"
+        method: "POST"
+        path: "/api/v1/analyze/url"
+        body:
+          url: "https://example.com"
+          tools: ["axe"]
+          wcagLevel: "AA"
+        id: "analysis_homepage"
+      
+      - service: "middleware"
+        method: "POST"
+        path: "/api/v1/analyze/url"
+        body:
+          url: "https://example.com/about"
+          tools: ["axe"]
+          wcagLevel: "AA"
+        id: "analysis_about"
+      
+      - service: "middleware"
+        method: "POST"
+        path: "/api/v1/analyze/url"
+        body:
+          url: "https://example.com/contact"
+          tools: ["axe"]
+          wcagLevel: "AA"
+        id: "analysis_contact"
+    
+    note: |
+      Para análisis en lote, considera:
+      - Rate limiting: 20 req/min para análisis
+      - Uso de análisis asíncrono para URLs complejas
+      - Monitoreo del progreso via /api/v1/analyze/status/{id}
+
+# ===== SCHEMAS ADICIONALES =====
+
+extended_schemas:
+
+  # Schema para respuestas de error detalladas
+  DetailedErrorResponse:
+    type: object
+    properties:
+      error:
+        type: object
+        properties:
+          code:
+            type: string
+            description: "Código único del error"
+            example: "VALIDATION_ERROR"
+          message:
+            type: string
+            description: "Mensaje principal del error"
+            example: "Los datos proporcionados no son válidos"
+          details:
+            type: array
+            description: "Detalles específicos de validación"
+            items:
+              type: object
+              properties:
+                field:
+                  type: string
+                  description: "Campo que causó el error"
+                  example: "email"
+                message:
+                  type: string
+                  description: "Mensaje específico del campo"
+                  example: "El formato del email no es válido"
+                code:
+                  type: string
+                  description: "Código específico del error de campo"
+                  example: "INVALID_EMAIL_FORMAT"
+                value:
+                  type: string
+                  description: "Valor que causó el error"
+                  example: "invalid-email"
+          stackTrace:
+            type: string
+            description: "Stack trace del error (solo en desarrollo)"
+            nullable: true
+          requestId:
+            type: string
+            description: "ID único de la petición para trazabilidad"
+            example: "req_123456789"
+      timestamp:
+        type: string
+        format: date-time
+        description: "Timestamp del error"
+      service:
+        type: string
+        description: "Servicio que generó el error"
+        example: "users"
+      endpoint:
+        type: string
+        description: "Endpoint que causó el error"
+        example: "/api/v1/users"
+
+  # Schema para métricas avanzadas
+  AdvancedMetrics:
+    type: object
+    properties:
+      gateway:
+        type: object
+        properties:
+          uptime:
+            type: string
+            description: "Tiempo de actividad del gateway"
+            example: "5d 12h 30m"
+          version:
+            type: string
+            description: "Versión del gateway"
+            example: "v1.0.0"
+          buildInfo:
+            type: object
+            properties:
+              buildDate:
+                type: string
+                format: date-time
+              gitCommit:
+                type: string
+                example: "abc123def456"
+              environment:
+                type: string
+                enum: [development, staging, production]
+      
+      performance:
+        type: object
+        properties:
+          cpu:
+            type: object
+            properties:
+              usage:
+                type: number
+                format: double
+                description: "Uso de CPU en porcentaje"
+                example: 45.6
+              cores:
+                type: integer
+                description: "Número de cores disponibles"
+                example: 4
+          
+          memory:
+            type: object
+            properties:
+              used:
+                type: integer
+                format: int64
+                description: "Memoria usada en bytes"
+                example: 536870912
+              total:
+                type: integer
+                format: int64
+                description: "Memoria total en bytes"
+                example: 2147483648
+              percentage:
+                type: number
+                format: double
+                description: "Porcentaje de memoria usada"
+                example: 25.0
+          
+          requests:
+            type: object
+            properties:
+              total:
+                type: integer
+                format: int64
+                description: "Total de peticiones procesadas"
+                example: 123456
+              
+              perSecond:
+                type: number
+                format: double
+                description: "Peticiones por segundo (promedio últimos 5 min)"
+                example: 12.5
+              
+              successRate:
+                type: number
+                format: double
+                description: "Tasa de éxito en porcentaje"
+                minimum: 0
+                maximum: 100
+                example: 98.7
+              
+              averageResponseTime:
+                type: number
+                format: double
+                description: "Tiempo promedio de respuesta en ms"
+                example: 156.7
+              
+              p95ResponseTime:
+                type: number
+                format: double
+                description: "Percentil 95 de tiempo de respuesta en ms"
+                example: 345.2
+      
+      services:
+        type: object
+        additionalProperties:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [healthy, degraded, unhealthy, unknown]
+            lastCheck:
+              type: string
+              format: date-time
+            responseTime:
+              type: number
+              format: double
+              description: "Tiempo de respuesta del último health check en ms"
+            errorRate:
+              type: number
+              format: double
+              description: "Tasa de error en las últimas 24h"
+            requestCount:
+              type: integer
+              format: int64
+              description: "Número de peticiones en las últimas 24h"
+
+  # Schema para configuración del análisis avanzado
+  AdvancedAnalysisConfig:
+    type: object
+    properties:
+      analysisProfile:
+        type: string
+        enum: [quick, standard, comprehensive, custom]
+        description: "Perfil predefinido de análisis"
+        default: standard
+      
+      rules:
+        type: object
+        properties:
+          wcag:
+            type: object
+            properties:
+              level:
+                type: string
+                enum: [A, AA, AAA]
+                default: AA
+              version:
+                type: string
+                enum: ["2.0", "2.1", "2.2"]
+                default: "2.1"
+              
+              customRules:
+                type: array
+                items:
+                  type: string
+                description: "IDs de reglas personalizadas"
+                example: ["custom-rule-1", "custom-rule-2"]
+              
+              excludedRules:
+                type: array
+                items:
+                  type: string
+                description: "IDs de reglas a excluir"
+                example: ["color-contrast-enhanced"]
+          
+          additional:
+            type: object
+            properties:
+              performanceCheck:
+                type: boolean
+                description: "Incluir verificaciones de rendimiento"
+                default: false
+              
+              seoBasics:
+                type: boolean
+                description: "Incluir verificaciones básicas de SEO"
+                default: false
+              
+              mobileFriendly:
+                type: boolean
+                description: "Verificar compatibilidad móvil"
+                default: true
+      
+      output:
+        type: object
+        properties:
+          formats:
+            type: array
+            items:
+              type: string
+              enum: [json, html, pdf, csv]
+            default: [json]
+          
+          includeScreenshots:
+            type: boolean
+            default: true
+          
+          screenshotOptions:
+            type: object
+            properties:
+              fullPage:
+                type: boolean
+                default: true
+              quality:
+                type: integer
+                minimum: 1
+                maximum: 100
+                default: 80
+              format:
+                type: string
+                enum: [png, jpeg, webp]
+                default: png
+          
+          detailLevel:
+            type: string
+            enum: [summary, standard, detailed, verbose]
+            default: standard
+      
+      browser:
+        type: object
+        properties:
+          userAgent:
+            type: string
+            description: "User agent personalizado"
+          
+          cookies:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                value:
+                  type: string
+                domain:
+                  type: string
+                path:
+                  type: string
+                  default: "/"
+                secure:
+                  type: boolean
+                  default: false
+                httpOnly:
+                  type: boolean
+                  default: false
+          
+          headers:
+            type: object
+            additionalProperties:
+              type: string
+            description: "Headers HTTP personalizados"
+          
+          authentication:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [none, basic, bearer, custom]
+                default: none
+              credentials:
+                type: object
+                description: "Credenciales según el tipo de auth"
+
+# ===== DOCUMENTACIÓN DE INTEGRACIÓN =====
+
+integration_guides:
+
+  webhook_integration:
+    title: "Integración con Webhooks"
+    description: |
+      Cómo configurar webhooks para recibir notificaciones de eventos:
+      
+      1. Configurar endpoint webhook en tu aplicación
+      2. Registrar webhook via API de configuración
+      3. Manejar eventos de análisis completado, reportes generados, etc.
+    
+    webhook_events:
+      - "analysis.completed"
+      - "analysis.failed" 
+      - "report.generated"
+      - "report.failed"
+      - "user.registered"
+      - "user.login"
+    
+    webhook_payload_example:
+      event: "analysis.completed"
+      timestamp: "2025-08-30T19:30:00Z"
+      data:
+        analysisId: 123
+        userId: 456
+        url: "https://example.com"
+        status: "completed"
+        score: 87.5
+        violations: 5
+        warnings: 12
+
+  sdk_examples:
+    javascript:
+      title: "SDK JavaScript/TypeScript"
+      example: |
+        ```typescript
+        import { AccessibilityAPI } from '@company/accessibility-sdk';
+        
+        const api = new AccessibilityAPI({
+          baseURL: 'https://api.accessibility.company.com',
+          apiKey: 'your-api-key'
+        });
+        
+        // Analizar URL
+        const analysis = await api.analyze.url({
+          url: 'https://example.com',
+          tools: ['axe', 'equalAccess'],
+          wcagLevel: 'AA'
+        });
+        
+        // Generar reporte
+        const report = await api.reports.create({
+          title: 'Mi Reporte',
+          analysisId: analysis.id
+        });
+        ```
+    
+    python:
+      title: "SDK Python"
+      example: |
+        ```python
+        from accessibility_sdk import AccessibilityAPI
+        
+        api = AccessibilityAPI(
+            base_url='https://api.accessibility.company.com',
+            api_key='your-api-key'
+        )
+        
+        # Analizar URL
+        analysis = api.analyze.url(
+            url='https://example.com',
+            tools=['axe', 'equalAccess'],
+            wcag_level='AA'
+        )
+        
+        # Generar reporte
+        report = api.reports.create(
+            title='Mi Reporte',
+            analysis_id=analysis['id']
+        )
+        ```
+    
+    csharp:
+      title: "SDK C#"
+      example: |
+        ```csharp
+        using AccessibilitySDK;
+        
+        var api = new AccessibilityAPIClient(new AccessibilityAPIConfig
+        {
+            BaseUrl = "https://api.accessibility.company.com",
+            ApiKey = "your-api-key"
+        });
+        
+        // Analizar URL
+        var analysis = await api.Analyze.UrlAsync(new AnalyzeUrlRequest
+        {
+            Url = "https://example.com",
+            Tools = new[] { "axe", "equalAccess" },
+            WcagLevel = WcagLevel.AA
+        });
+        
+        // Generar reporte
+        var report = await api.Reports.CreateAsync(new CreateReportRequest
+        {
+            Title = "Mi Reporte",
+            AnalysisId = analysis.Id
+        });
+        ```
+
+# ===== CASOS DE USO COMUNES =====
+
+common_use_cases:
+
+  continuous_integration:
+    title: "Integración Continua (CI/CD)"
+    description: |
+      Usar la API en pipelines de CI/CD para verificación automática de accesibilidad:
+      
+      ```yaml
+      # GitHub Actions example
+      - name: Accessibility Check
+        run: |
+          curl -X POST "https://api.accessibility.company.com/api/v1/translate" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+            -d '{
+              "service": "middleware",
+              "method": "POST", 
+              "path": "/api/v1/analyze/url",
+              "body": {
+                "url": "${{ env.DEPLOY_URL }}",
+                "tools": ["axe"],
+                "wcagLevel": "AA"
+              }
+            }'
+      ```
+
+  automated_reporting:
+    title: "Reportes Automatizados"
+    description: |
+      Generar reportes periódicos de accesibilidad:
+      
+      1. Script programado que analiza URLs principales
+      2. Genera reportes automáticamente
+      3. Envía por email o guarda en sistema de documentos
+      4. Compara métricas con análisis anteriores
+
+  compliance_monitoring:
+    title: "Monitoreo de Cumplimiento"
+    description: |
+      Monitorear continuamente el cumplimiento de accesibilidad:
+      
+      - Análisis programados de páginas críticas
+      - Alertas cuando la puntuación baja del umbral
+      - Dashboard en tiempo real con métricas
+      - Reportes de compliance para auditorías

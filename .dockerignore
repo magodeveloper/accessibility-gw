@@ -1,0 +1,53 @@
+# Excluir proyectos de test
+tests/
+**/tests/
+*.Tests/
+**/*.Tests/
+tests_TEMP/
+
+# Excluir archivos temporales y de build
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Excluir archivos de configuración local
+.env
+.env.local
+.vscode/
+.vs/
+*.user
+
+# Excluir archivos de documentación
+README*.md
+*.md
+docs/
+
+# Excluir archivos de Git
+.git/
+.gitignore
+.gitattributes
+
+# Excluir archivos de Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Excluir archivos de logs
+logs/
+*.log
+src/logs/
+
+# Excluir archivos temporales
+*.tmp
+*.temp
+*~
+
+# Excluir archivos específicos del proyecto
+build-production-only.ps1
+build-production.ps1
+manage-gateway.ps1
+DIRECTORY_PACKAGES_SUCCESS.md
+DOCKER-IMPROVEMENTS.md
+.env.example
+scripts/

@@ -1,0 +1,1000 @@
+# =====================================================
+# EXTENSIÓN DE DOCUMENTACIÓN OPENAPI - MICROSERVICIOS
+# =====================================================
+# 
+# Esta es la extensión de gateway-complete-api.yaml con la documentación
+# completa de todos los endpoints de microservicios.
+#
+# Para usar: Combinar con el archivo principal o incluir mediante $ref
+
+# ===== USERS MICROSERVICE ENDPOINTS =====
+paths_extension:
+  
+  # === AUTENTICACIÓN ===
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Iniciar sesión
+      description: |
+        Autentica un usuario y devuelve un JWT token.
+        
+        **Vía Gateway**: 
+        ```
+        POST /api/v1/translate
+        {
+          "service": "users",
+          "method": "POST", 
+          "path": "/api/v1/auth/login",
+          "body": { "email": "...", "password": "..." }
+        }
+        ```
+        
+        **Directo**: `POST /api/v1/services/users/api/v1/auth/login`
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: "usuario@example.com"
+              password: "password123"
+      responses:
+        '200':
+          description: Autenticación exitosa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                user:
+                  id: 123
+                  nickname: "usuario"
+                  name: "Usuario"
+                  lastname: "Ejemplo"
+                  email: "usuario@example.com"
+                  role: "User"
+                  status: "Active"
+                expiresAt: "2025-08-31T19:30:00Z"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Registrar nuevo usuario
+      description: |
+        Registra un nuevo usuario en el sistema.
+        
+        **Vía Gateway**: 
+        ```
+        POST /api/v1/translate
+        {
+          "service": "users",
+          "method": "POST",
+          "path": "/api/v1/auth/register",
+          "body": { ... }
+        }
+        ```
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateDto'
+      responses:
+        '201':
+          description: Usuario creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Usuario ya existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Renovar token JWT
+      description: Renueva un token JWT existente antes de que expire
+      operationId: refreshToken
+      responses:
+        '200':
+          description: Token renovado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Cerrar sesión
+      description: Invalida el token JWT actual
+      operationId: logout
+      responses:
+        '200':
+          description: Sesión cerrada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # === GESTIÓN DE USUARIOS ===
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: Obtener lista de usuarios
+      description: |
+        Obtiene una lista paginada de usuarios del sistema.
+        
+        **Rate Limit**: 100 req/min
+        
+        **Permisos**: Admin o SuperAdmin
+        
+        **Vía Gateway**: 
+        ```
+        POST /api/v1/translate
+        {
+          "service": "users",
+          "method": "GET",
+          "path": "/api/v1/users",
+          "query": { "page": "1", "limit": "10" }
+        }
+        ```
+      operationId: getUsers
+      parameters:
+        - name: page
+          in: query
+          description: Número de página
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Elementos por página
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: search
+          in: query
+          description: Buscar por nombre, email o nickname
+          schema:
+            type: string
+        - name: role
+          in: query
+          description: Filtrar por rol
+          schema:
+            type: string
+            enum: [User, Admin, SuperAdmin]
+        - name: status
+          in: query
+          description: Filtrar por estado
+          schema:
+            type: string
+            enum: [Active, Inactive, Suspended]
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserReadDto'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Users]
+      summary: Crear nuevo usuario
+      description: |
+        Crea un nuevo usuario en el sistema.
+        
+        **Permisos**: Admin o SuperAdmin
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateDto'
+      responses:
+        '201':
+          description: Usuario creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserReadDto'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Usuario ya existe
+
+  /api/v1/users/{id}:
+    get:
+      tags: [Users]
+      summary: Obtener usuario por ID
+      description: |
+        Obtiene la información de un usuario específico.
+        
+        **Permisos**: 
+        - El propio usuario puede ver su información
+        - Admin/SuperAdmin pueden ver cualquier usuario
+      operationId: getUserById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 123
+      responses:
+        '200':
+          description: Información del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserReadDto'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Users]
+      summary: Actualizar usuario
+      description: |
+        Actualiza la información de un usuario.
+        
+        **Permisos**:
+        - El propio usuario puede actualizar su información básica
+        - Admin/SuperAdmin pueden actualizar cualquier usuario
+      operationId: updateUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateDto'
+      responses:
+        '200':
+          description: Usuario actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserReadDto'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Users]
+      summary: Eliminar usuario
+      description: |
+        Elimina un usuario del sistema.
+        
+        **Permisos**: SuperAdmin únicamente
+      operationId: deleteUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Usuario eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # === PREFERENCIAS DE USUARIO ===
+  /api/v1/users/{id}/preferences:
+    get:
+      tags: [User Preferences]
+      summary: Obtener preferencias del usuario
+      operationId: getUserPreferences
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Preferencias del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [User Preferences]
+      summary: Actualizar preferencias del usuario
+      operationId: updateUserPreferences
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+      responses:
+        '200':
+          description: Preferencias actualizadas exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===== REPORTS MICROSERVICE ENDPOINTS =====
+  
+  /api/v1/reports:
+    get:
+      tags: [Reports]
+      summary: Obtener lista de reportes
+      description: |
+        Obtiene una lista paginada de reportes del usuario.
+        
+        **Vía Gateway**: 
+        ```
+        POST /api/v1/translate
+        {
+          "service": "reports",
+          "method": "GET",
+          "path": "/api/v1/reports",
+          "query": { "page": "1", "limit": "10" }
+        }
+        ```
+      operationId: getReports
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: status
+          in: query
+          description: Filtrar por estado
+          schema:
+            type: string
+            enum: [Draft, InProgress, Completed, Failed]
+        - name: analysisId
+          in: query
+          description: Filtrar por ID de análisis
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Lista de reportes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportReadDto'
+
+    post:
+      tags: [Reports]
+      summary: Crear nuevo reporte
+      description: |
+        Crea un nuevo reporte basado en un análisis existente.
+        
+        El reporte se genera de forma asíncrona y el estado se puede consultar
+        mediante el endpoint GET /api/v1/reports/{id}.
+      operationId: createReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportCreateDto'
+            example:
+              title: "Reporte de Accesibilidad - Homepage"
+              description: "Análisis completo de la página principal"
+              analysisId: 456
+      responses:
+        '201':
+          description: Reporte creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportReadDto'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          description: Análisis no encontrado
+
+  /api/v1/reports/{id}:
+    get:
+      tags: [Reports]
+      summary: Obtener reporte por ID
+      operationId: getReportById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Información del reporte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportReadDto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Reports]
+      summary: Actualizar reporte
+      operationId: updateReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                description:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Reporte actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportReadDto'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Reports]
+      summary: Eliminar reporte
+      operationId: deleteReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Reporte eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/reports/{id}/download:
+    get:
+      tags: [Reports]
+      summary: Descargar reporte generado
+      description: |
+        Descarga el archivo PDF del reporte generado.
+        
+        **Nota**: Solo disponible para reportes con estado 'Completed'
+      operationId: downloadReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: format
+          in: query
+          description: Formato del reporte
+          schema:
+            type: string
+            enum: [pdf, html, json]
+            default: pdf
+      responses:
+        '200':
+          description: Archivo del reporte
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+            text/html:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Reporte no completado
+
+  # ===== ANALYSIS MICROSERVICE ENDPOINTS =====
+  
+  /api/v1/analysis:
+    get:
+      tags: [Analysis]
+      summary: Obtener lista de análisis
+      description: |
+        Obtiene una lista paginada de análisis del usuario.
+        
+        **Rate Limit**: 20 req/min (endpoint computacionalmente intensivo)
+        
+        **Vía Gateway**: 
+        ```
+        POST /api/v1/translate
+        {
+          "service": "analysis",
+          "method": "GET",
+          "path": "/api/v1/analysis",
+          "query": { "page": "1", "limit": "10" }
+        }
+        ```
+      operationId: getAnalyses
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+        - name: status
+          in: query
+          description: Filtrar por estado
+          schema:
+            type: string
+            enum: [Pending, InProgress, Completed, Failed]
+        - name: wcagLevel
+          in: query
+          description: Filtrar por nivel WCAG
+          schema:
+            type: string
+            enum: [A, AA, AAA]
+        - name: minScore
+          in: query
+          description: Puntuación mínima
+          schema:
+            type: number
+            format: double
+            minimum: 0
+            maximum: 100
+        - name: maxScore
+          in: query
+          description: Puntuación máxima
+          schema:
+            type: number
+            format: double
+            minimum: 0
+            maximum: 100
+      responses:
+        '200':
+          description: Lista de análisis
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AnalysisReadDto'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+    post:
+      tags: [Analysis]
+      summary: Crear nuevo análisis
+      description: |
+        Inicia un nuevo análisis de accesibilidad para una URL.
+        
+        **Rate Limit**: 20 req/min
+        
+        El análisis se ejecuta de forma asíncrona. El estado se puede consultar
+        mediante el endpoint GET /api/v1/analysis/{id}.
+      operationId: createAnalysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCreateDto'
+            example:
+              url: "https://example.com"
+              title: "Análisis de Homepage"
+              wcagLevel: "AA"
+              includeScreenshot: true
+      responses:
+        '201':
+          description: Análisis creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisReadDto'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/analysis/{id}:
+    get:
+      tags: [Analysis]
+      summary: Obtener análisis por ID
+      operationId: getAnalysisById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Información del análisis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisReadDto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Analysis]
+      summary: Eliminar análisis
+      operationId: deleteAnalysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Análisis eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/analysis/{id}/retry:
+    post:
+      tags: [Analysis]
+      summary: Reintentar análisis fallido
+      description: |
+        Reintenta un análisis que falló anteriormente.
+        
+        **Rate Limit**: 20 req/min
+      operationId: retryAnalysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Análisis reintentado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisReadDto'
+        '400':
+          description: Análisis no puede ser reintentado
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  # ===== MIDDLEWARE ENDPOINTS =====
+  
+  /api/v1/analyze/url:
+    post:
+      tags: [Middleware Analysis]
+      summary: Analizar URL con herramientas avanzadas
+      description: |
+        Realiza un análisis completo de accesibilidad de una URL utilizando
+        múltiples herramientas (Axe, Equal Access).
+        
+        **Rate Limit**: 20 req/min
+        
+        **Timeout**: 30s por defecto (configurable hasta 120s)
+        
+        **Vía Gateway**: 
+        ```
+        POST /api/v1/translate
+        {
+          "service": "middleware",
+          "method": "POST",
+          "path": "/api/v1/analyze/url",
+          "body": {
+            "url": "https://example.com",
+            "tools": ["axe", "equalAccess"],
+            "wcagLevel": "AA"
+          }
+        }
+        ```
+      operationId: analyzeUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeUrlRequest'
+            examples:
+              basic:
+                summary: Análisis básico
+                value:
+                  url: "https://example.com"
+                  tools: ["axe", "equalAccess"]
+                  wcagLevel: "AA"
+              advanced:
+                summary: Análisis avanzado con configuración personalizada
+                value:
+                  url: "https://example.com"
+                  tools: ["axe", "equalAccess"]
+                  wcagLevel: "AAA"
+                  includeScreenshot: true
+                  viewport:
+                    width: 1920
+                    height: 1080
+                  timeout: 60000
+      responses:
+        '200':
+          description: Análisis completado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '408':
+          description: Timeout del análisis
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          description: Error durante el análisis
+
+  /api/v1/analyze/html:
+    post:
+      tags: [Middleware Analysis]
+      summary: Analizar HTML directo
+      description: |
+        Analiza código HTML proporcionado directamente sin necesidad de URL.
+        
+        **Rate Limit**: 20 req/min
+        
+        Útil para:
+        - Analizar HTML generado dinámicamente
+        - Testear fragmentos específicos
+        - Análisis offline
+      operationId: analyzeHtml
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeHtmlRequest'
+            example:
+              html: "<!DOCTYPE html><html><head><title>Test</title></head><body><h1>Hello World</h1><img src='test.jpg'></body></html>"
+              tools: ["axe", "equalAccess"]
+              wcagLevel: "AA"
+              baseUrl: "https://example.com"
+      responses:
+        '200':
+          description: Análisis completado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '413':
+          description: HTML demasiado grande
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/analyze/status/{id}:
+    get:
+      tags: [Middleware Analysis]
+      summary: Obtener estado de análisis
+      description: |
+        Consulta el estado de un análisis en progreso.
+        
+        Útil para análisis asíncronos de larga duración.
+      operationId: getAnalysisStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "analysis-123-456"
+      responses:
+        '200':
+          description: Estado del análisis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, running, completed, failed]
+                  progress:
+                    type: number
+                    format: double
+                    minimum: 0
+                    maximum: 100
+                    description: Porcentaje de progreso
+                  startTime:
+                    type: string
+                    format: date-time
+                  estimatedCompletion:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '404':
+          description: Análisis no encontrado
+
+  /api/v1/tools/available:
+    get:
+      tags: [Middleware Analysis]
+      summary: Obtener herramientas disponibles
+      description: |
+        Lista las herramientas de análisis disponibles y sus capacidades.
+      operationId: getAvailableTools
+      security: []
+      responses:
+        '200':
+          description: Lista de herramientas disponibles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: "axe"
+                        version:
+                          type: string
+                          example: "4.8.2"
+                        description:
+                          type: string
+                          example: "Accessibility testing engine"
+                        capabilities:
+                          type: array
+                          items:
+                            type: string
+                          example: ["wcag-a", "wcag-aa", "wcag-aaa"]
+                        supportedFormats:
+                          type: array
+                          items:
+                            type: string
+                          example: ["html", "url"]
+
+# ===== TAGS ADICIONALES =====
+additional_tags:
+  - name: Authentication
+    description: Endpoints de autenticación y autorización
+  - name: Users
+    description: Gestión de usuarios del sistema
+  - name: User Preferences
+    description: Configuración y preferencias de usuario
+  - name: Reports
+    description: Generación y gestión de reportes de accesibilidad
+  - name: Analysis
+    description: Análisis de accesibilidad web estándar
+  - name: Middleware Analysis
+    description: Análisis avanzado con herramientas especializadas

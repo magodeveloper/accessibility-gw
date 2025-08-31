@@ -54,7 +54,7 @@ public sealed class TranslateRequest
 /// <summary>
 /// Respuesta del gateway después de procesar la petición
 /// </summary>
-public sealed class TranslateResponse
+public sealed record TranslateResponse
 {
     /// <summary>
     /// Código de estado HTTP
@@ -121,7 +121,7 @@ public sealed class TranslateError
 /// <summary>
 /// Resultado completo de la traducción
 /// </summary>
-public sealed class TranslateResult
+public sealed record TranslateResult
 {
     /// <summary>
     /// Respuesta exitosa
@@ -158,7 +158,7 @@ public sealed class HealthCheckRequest
 /// <summary>
 /// Respuesta del health check
 /// </summary>
-public sealed class HealthCheckResponse
+public sealed record HealthCheckResponse
 {
     /// <summary>
     /// Estado general (Healthy, Unhealthy, Degraded)

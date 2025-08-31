@@ -1,6 +1,6 @@
 using Gateway.Models;
-using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Gateway.Services;
 
@@ -106,12 +106,13 @@ public sealed class CacheService
     /// <summary>
     /// Invalida el caché para un servicio específico
     /// </summary>
-    public async Task InvalidateServiceCacheAsync(string service, CancellationToken cancellationToken = default)
+    public Task InvalidateServiceCacheAsync(string service, CancellationToken cancellationToken = default)
     {
         // Nota: Esta es una implementación simplificada
         // En producción se podría usar Redis con patrones para invalidación masiva
         _logger.LogInformation("Cache invalidation requested for service: {Service}", service);
         // TODO: Implementar invalidación por patrón si es necesario
+        return Task.CompletedTask;
     }
 
     private static bool IsSensitiveHeader(string headerName)

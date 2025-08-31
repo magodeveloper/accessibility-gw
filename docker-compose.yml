@@ -1,95 +1,97 @@
-version: '3.8'
-
 services:
   accessibility-gateway:
     build:
-      context: ./src
+      context: .
       dockerfile: Dockerfile
-    container_name: accessibility-gw
+      args:
+        BUILD_CONFIGURATION: Release
+    image: accessibility-gateway:latest
+    container_name: accessibility-gateway
     ports:
-      - "8000:8080"
-      - "8001:8081"
+      - '8100:8080'
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
-      - Gate__Services__users=http://accessibility-ms-users:8080
-      - Gate__Services__reports=http://accessibility-ms-reports:8081
-      - Gate__Services__analysis=http://accessibility-ms-analysis:8082
-      - Gate__Services__middleware=http://accessibility-mw:3000
+      - Gate__Services__users=http://msusers-api:8081
+      - Gate__Services__reports=http://msreports-api:8083
+      - Gate__Services__analysis=http://msanalysis-api:8082
+      - Gate__Services__middleware=http://accessibility-mw-prod:3001
       - Redis__ConnectionString=redis:6379
-      - Jwt__Authority=https://accessibility-auth:5001
+      - Jwt__Authority=https://accessibility-auth:8100
       - Jwt__Audience=accessibility-gateway
+      - DOTNET_ENVIRONMENT=Production
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     volumes:
       - gateway-logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
     networks:
-      - accessibility-network
+      - accessibility-shared
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      test: ['CMD-SHELL', 'curl -f http://localhost:8080/health/live || exit 1']
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   redis:
     image: redis:7.2-alpine
     container_name: accessibility-redis
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis-data:/data
+      - /etc/localtime:/etc/localtime:ro
     networks:
-      - accessibility-network
+      - accessibility-shared
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: |
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec 
+      --maxmemory 256mb 
+      --maxmemory-policy allkeys-lru 
+      --tcp-keepalive 60 
+      --timeout 0
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 30s
       timeout: 5s
       retries: 3
-
-  # Servicios externos (cuando estén disponibles)
-  # accessibility-ms-users:
-  #   image: accessibility-ms-users:latest
-  #   container_name: accessibility-ms-users
-  #   ports:
-  #     - "8080:8080"
-  #   networks:
-  #     - accessibility-network
-
-  # accessibility-ms-reports:
-  #   image: accessibility-ms-reports:latest
-  #   container_name: accessibility-ms-reports
-  #   ports:
-  #     - "8081:8081"
-  #   networks:
-  #     - accessibility-network
-
-  # accessibility-ms-analysis:
-  #   image: accessibility-ms-analysis:latest
-  #   container_name: accessibility-ms-analysis
-  #   ports:
-  #     - "8082:8082"
-  #   networks:
-  #     - accessibility-network
-
-  # accessibility-mw:
-  #   image: accessibility-mw:latest
-  #   container_name: accessibility-mw
-  #   ports:
-  #     - "3000:3000"
-  #   networks:
-  #     - accessibility-network
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
 volumes:
   gateway-logs:
     driver: local
+    name: accessibility-gateway-logs
   redis-data:
     driver: local
+    name: accessibility-redis-data
 
 networks:
-  accessibility-network:
-    driver: bridge
-    name: accessibility-network
+  accessibility-shared:
+    external: true
+    name: accessibility-shared
