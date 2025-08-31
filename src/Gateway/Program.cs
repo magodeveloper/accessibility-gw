@@ -285,19 +285,26 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
-if (app.Environment.IsDevelopment())
+// Habilitar Swagger tanto en Development como en Production para facilitar testing
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Accessibility Gateway API v1");
+    c.RoutePrefix = "swagger"; // Swagger UI en /swagger
+    c.DisplayRequestDuration();
+    c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+    c.EnableFilter();
+    c.EnableDeepLinking();
+
+    // En producción, mostrar advertencia sobre el uso de Swagger
+    if (app.Environment.IsProduction())
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Accessibility Gateway API v1");
-        c.RoutePrefix = "swagger"; // Swagger UI en /swagger
-        c.DisplayRequestDuration();
-        c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
-        c.EnableFilter();
-        c.EnableDeepLinking();
-    });
-}
+        c.DocumentTitle = "Accessibility Gateway API (PRODUCTION) - Use with caution";
+    }
+});
+
+// Redirección específica para mejorar UX de Swagger
+app.MapGet("/swagger", () => Results.Redirect("/swagger/index.html", true));
 
 // Comentado para desarrollo local sin HTTPS
 // app.UseHsts();
