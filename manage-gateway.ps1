@@ -8,27 +8,33 @@
     Script optimizado todo-en-uno para:
     - Testing (Unit, Integration, Performance)
     - Building (Local, Docker, Production)
-    - Local Development Server (unifica start-local.ps1)
+    - Local Development Server (desarrollo aislado)
     - Verificación y Health Checks
-    - Gestión de Docker (up, down, logs, status)
+    - Gestión de Docker (up, down, logs, status)  
     - Cleanup y mantenimiento
+    - Integración con manage.ps1 del middleware
 
 .PARAMETER Action
     Acción principal: test, build, run, verify, docker, cleanup, help
 
+.NOTES
+    Este script complementa al manage.ps1 del middleware principal.
+    Mientras manage.ps1 orquesta todo el ecosistema, este script
+    se enfoca en el desarrollo granular del Gateway específicamente.
+
 .EXAMPLES
     .\manage-gateway.ps1 help
-    .\manage-gateway.ps1 test
-    .\manage-gateway.ps1 build -Configuration Release
+    .\manage-gateway.ps1 test -TestType Unit -GenerateCoverage
+    .\manage-gateway.ps1 build -Configuration Release -BuildType production
     .\manage-gateway.ps1 run -Port 8100
     .\manage-gateway.ps1 docker up -Environment dev
     .\manage-gateway.ps1 verify -Full
-    .\manage-gateway.ps1 cleanup -Docker
+    .\manage-gateway.ps1 cleanup -Docker -Volumes
 #>
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('test', 'build', 'verify', 'docker', 'cleanup', 'run', 'consistency', 'help')]
+    [ValidateSet('test', 'build', 'verify', 'docker', 'cleanup', 'run', 'consistency', 'status', 'help')]
     [string]$Action = 'help',
     
     [Parameter(Position = 1)]
@@ -85,6 +91,9 @@ $script:TestSrcPath = "src/tests"
 $script:ProjectPath = "src/Gateway"
 $script:SolutionFile = "Gateway.sln"
 $script:TestSolutionFile = "src/tests/Gateway.Tests.sln"
+$script:TestBasicPath = "src/tests/Gateway.Tests.Basic"
+$script:TestUnitPath = "src/tests/Gateway.UnitTests"
+$script:TestIntegrationPath = "src/tests/Gateway.IntegrationTests"
 
 # ===========================================
 # FUNCIONES AUXILIARES
@@ -97,6 +106,56 @@ function Write-Error { param($msg) Write-Host "   ❌ $msg" -ForegroundColor Red
 function Write-Warning { param($msg) Write-Host "   ⚠️ $msg" -ForegroundColor Yellow }
 function Write-Info { param($msg) Write-Host "   ℹ️ $msg" -ForegroundColor Blue }
 
+function Test-Prerequisites {
+    Write-Header "PREREQUISITES VALIDATION"
+    
+    $issues = @()
+    
+    # Check .NET SDK
+    if (-not (Test-CommandExists 'dotnet')) {
+        $issues += "❌ .NET SDK not installed"
+    }
+    else {
+        $version = dotnet --version
+        if ([version]$version -lt [version]"9.0") {
+            $issues += "⚠️ .NET SDK version $version (recommended: 9.0+)"
+        }
+        else {
+            Write-Success ".NET SDK $version - OK"
+        }
+    }
+    
+    # Check Docker
+    if (-not (Test-DockerRunning)) {
+        $issues += "⚠️ Docker not running (required for Docker commands)"
+    }
+    else {
+        Write-Success "Docker - Running"
+    }
+    
+    # Check project structure
+    if (-not (Test-Path $script:SolutionFile)) {
+        $issues += "❌ Solution file not found: $script:SolutionFile"
+    }
+    
+    if (-not (Test-Path $script:ProjectPath)) {
+        $issues += "❌ Project path not found: $script:ProjectPath"
+    }
+    
+    if (-not (Test-Path $script:TestSolutionFile)) {
+        $issues += "⚠️ Test solution not found: $script:TestSolutionFile"
+    }
+    
+    if ($issues.Count -gt 0) {
+        Write-Warning "Found $($issues.Count) prerequisite issues:"
+        $issues | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+        return $false
+    }
+    
+    Write-Success "All prerequisites validated ✨"
+    return $true
+}
+
 function Test-CommandExists {
     param([string]$Command)
     $null = Get-Command $Command -ErrorAction SilentlyContinue
@@ -107,7 +166,8 @@ function Test-DockerRunning {
     try {
         $result = docker version --format '{{.Server.Version}}' 2>$null
         return $null -ne $result
-    } catch {
+    }
+    catch {
         return $false
     }
 }
@@ -162,7 +222,8 @@ function Invoke-TestAction {
                 Start-Process $coverageFile.FullName
             }
         }
-    } else {
+    }
+    else {
         Write-Error "Tests failed with exit code: $LASTEXITCODE"
         return $LASTEXITCODE
     }
@@ -210,7 +271,8 @@ function Invoke-BuildAction {
     
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Build completed successfully!"
-    } else {
+    }
+    else {
         Write-Error "Build failed with exit code: $LASTEXITCODE"
         return $LASTEXITCODE
     }
@@ -271,7 +333,8 @@ function Invoke-DockerAction {
     
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Docker action completed successfully!"
-    } else {
+    }
+    else {
         Write-Error "Docker action failed with exit code: $LASTEXITCODE"
         return $LASTEXITCODE
     }
@@ -288,7 +351,8 @@ function Invoke-VerifyAction {
         $dotnetVersion = dotnet --version
         Write-Success ".NET SDK: $dotnetVersion"
         $checks += @{ Name = ".NET SDK"; Status = "✅"; Details = $dotnetVersion }
-    } else {
+    }
+    else {
         Write-Error ".NET SDK not found"
         $checks += @{ Name = ".NET SDK"; Status = "❌"; Details = "Not installed" }
     }
@@ -299,7 +363,8 @@ function Invoke-VerifyAction {
         $dockerVersion = docker version --format '{{.Server.Version}}'
         Write-Success "Docker: $dockerVersion"
         $checks += @{ Name = "Docker"; Status = "✅"; Details = $dockerVersion }
-    } else {
+    }
+    else {
         Write-Error "Docker not running"
         $checks += @{ Name = "Docker"; Status = "❌"; Details = "Not running" }
     }
@@ -309,7 +374,8 @@ function Invoke-VerifyAction {
     if (Test-Path $SolutionFile) {
         Write-Success "Solution file found"
         $checks += @{ Name = "Solution"; Status = "✅"; Details = $SolutionFile }
-    } else {
+    }
+    else {
         Write-Error "Solution file not found"
         $checks += @{ Name = "Solution"; Status = "❌"; Details = "Missing" }
     }
@@ -323,22 +389,28 @@ function Invoke-VerifyAction {
         if ($LASTEXITCODE -eq 0) {
             Write-Success "Build test passed"
             $checks += @{ Name = "Build Test"; Status = "✅"; Details = "Compiled successfully" }
-        } else {
+        }
+        else {
             Write-Error "Build test failed"
             $checks += @{ Name = "Build Test"; Status = "❌"; Details = "Compilation errors" }
         }
         
         # Test basic tests
-        if (Test-Path "$TestSrcPath/Gateway.Tests.Basic") {
+        if (Test-Path $script:TestBasicPath) {
             Write-Step "Running basic tests..."
-            dotnet test "$TestSrcPath/Gateway.Tests.Basic" --verbosity quiet
+            dotnet test $script:TestBasicPath --verbosity quiet
             if ($LASTEXITCODE -eq 0) {
                 Write-Success "Basic tests passed"
                 $checks += @{ Name = "Basic Tests"; Status = "✅"; Details = "All tests passed" }
-            } else {
+            }
+            else {
                 Write-Error "Basic tests failed"
                 $checks += @{ Name = "Basic Tests"; Status = "❌"; Details = "Some tests failed" }
             }
+        }
+        else {
+            Write-Warning "Basic tests not found at: $script:TestBasicPath"
+            $checks += @{ Name = "Basic Tests"; Status = "⚠️"; Details = "Test project not found" }
         }
     }
     
@@ -352,7 +424,8 @@ function Invoke-VerifyAction {
     if ($failed.Count -eq 0) {
         Write-Success "All checks passed! ✨"
         return 0
-    } else {
+    }
+    else {
         Write-Error "$($failed.Count) checks failed"
         return 1
     }
@@ -445,10 +518,12 @@ function Invoke-RunAction {
             $dotnetProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 2
             Write-Success "Previous dotnet processes cleaned"
-        } else {
+        }
+        else {
             Write-Info "No previous dotnet processes found"
         }
-    } catch {
+    }
+    catch {
         Write-Warning "Could not clean previous processes: $($_.Exception.Message)"
     }
     
@@ -473,7 +548,8 @@ function Invoke-RunAction {
     
     if ($NoLaunch) {
         Write-Warning "Auto-launch disabled. Gateway running on http://localhost:$Port"
-    } else {
+    }
+    else {
         Write-Step "Will auto-launch browser in 5 seconds..."
         Start-Sleep -Seconds 1
         Write-Host "   5..." -ForegroundColor Yellow
@@ -494,7 +570,8 @@ function Invoke-RunAction {
     Write-Success "🚀 Gateway starting..."
     try {
         dotnet run --project Gateway.csproj --configuration $Configuration
-    } finally {
+    }
+    finally {
         # Regresar al directorio original
         Set-Location $PSScriptRoot
         Write-Info "Returned to script directory"
@@ -507,6 +584,11 @@ function Show-Help {
 🚪 ACCESSIBILITY GATEWAY - MANAGEMENT SCRIPT
 ============================================
 
+COMPLEMENTO AL SCRIPT PRINCIPAL MANAGE.PS1
+------------------------------------------
+Este script se enfoca específicamente en el desarrollo y gestión 
+del Gateway (.NET), mientras que manage.ps1 orquesta todo el ecosistema.
+
 USAGE:
     .\manage-gateway.ps1 <action> [parameters]
 
@@ -516,9 +598,12 @@ ACTIONS:
     verify      Verify system health and dependencies       
     docker      Manage Docker containers (up, down, logs, status)
     cleanup     Clean build artifacts and Docker resources  
-    run         Start local development server
+    run         Start local development server (.NET specific)
     consistency Check system consistency and port conflicts
-    help        Show this help messageEXAMPLES:
+    status      Quick project status overview
+    help        Show this help message
+
+EJEMPLOS DE DESARROLLO:
 
 📋 TESTING:
     .\manage-gateway.ps1 test
@@ -546,10 +631,17 @@ ACTIONS:
     .\manage-gateway.ps1 cleanup -Docker -Volumes
     .\manage-gateway.ps1 cleanup -All
 
-🚀 LOCAL RUN:
+🚀 LOCAL RUN (.NET DEVELOPMENT):
     .\manage-gateway.ps1 run
     .\manage-gateway.ps1 run -Port 8085
     .\manage-gateway.ps1 run -AspNetCoreEnvironment Production -NoLaunch
+
+💡 COORDINACIÓN CON MIDDLEWARE:
+    # Para despliegue completo del ecosistema:
+    ..\accessibility-mw\manage.ps1 deploy-all
+    
+    # Para desarrollo local del Gateway únicamente:
+    .\manage-gateway.ps1 run -Port 8100
 
 PARAMETERS:
     -Configuration    Debug|Release (default: Release)
@@ -569,6 +661,66 @@ PARAMETERS:
 "@ -ForegroundColor Green
 }
 
+function Get-ProjectStatus {
+    Write-Header "PROJECT STATUS - Quick Overview"
+    
+    # 1. Basic Info
+    Write-Step "Project Information..."
+    Write-Info "📁 Project: $script:ProjectName"
+    Write-Info "🏗️ Solution: $script:SolutionFile"
+    Write-Info "📂 Source: $script:ProjectPath"
+    
+    # 2. Build Status  
+    Write-Step "Build Status..."
+    try {
+        dotnet build $script:SolutionFile --verbosity quiet --no-restore 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "✅ Build: SUCCESSFUL"
+        }
+        else {
+            Write-Warning "⚠️ Build: ISSUES DETECTED"
+        }
+    }
+    catch {
+        Write-Error "❌ Build: FAILED"
+    }
+    
+    # 3. Port Status
+    Write-Step "Port Status..."
+    $prodPort = netstat -an 2>$null | findstr ":8100"
+    $devPort = netstat -an 2>$null | findstr ":8101"
+    
+    if ($prodPort) { Write-Success "✅ Port 8100: IN USE (Production)" }
+    else { Write-Info "ℹ️ Port 8100: Available" }
+    
+    if ($devPort) { Write-Success "✅ Port 8101: IN USE (Development)" }
+    else { Write-Info "ℹ️ Port 8101: Available" }
+    
+    # 4. Docker Status
+    Write-Step "Docker Status..."
+    if (Test-DockerRunning) {
+        $containers = docker ps --filter "name=accessibility-gateway" --format "{{.Names}}: {{.Status}}" 2>$null
+        if ($containers) {
+            $containers | ForEach-Object { Write-Success "✅ $_" }
+        }
+        else {
+            Write-Info "ℹ️ No Gateway containers running"
+        }
+    }
+    else {
+        Write-Warning "⚠️ Docker: NOT RUNNING"
+    }
+    
+    # 5. Dependencies
+    Write-Step "Dependencies..."
+    if (Test-CommandExists 'dotnet') {
+        $dotnetVersion = dotnet --version
+        Write-Success "✅ .NET SDK: $dotnetVersion"
+    }
+    
+    Write-Success "Status check completed! 🎯"
+}
+
 function Test-SystemConsistency {
     Write-Header "SYSTEM CONSISTENCY CHECK"
     
@@ -578,15 +730,17 @@ function Test-SystemConsistency {
     
     # Check production port (now default)
     if ($prodPort) {
-        Write-Success "✅ Production port 8100: IN USE (Production Gateway running - DEFAULT)"
-    } else {
+        Write-Success "✅ Production port 8100: IN USE (Production Gateway running)"
+    }
+    else {
         Write-Info "ℹ️ Production port 8100: Available"
     }
     
     # Check development port (optional)
     if ($devPort) {
         Write-Success "✅ Development port 8101: IN USE (Development Gateway running)"
-    } else {
+    }
+    else {
         Write-Info "ℹ️ Development port 8101: Available (Development mode not active)"
     }
     
@@ -596,11 +750,14 @@ function Test-SystemConsistency {
     foreach ($container in $containers) {
         if ($container -match "accessibility-gateway.*healthy.*8100") {
             Write-Success "✅ Production Gateway: HEALTHY on port 8100"
-        } elseif ($container -match "accessibility-gw-dev.*healthy.*8101") {
+        }
+        elseif ($container -match "accessibility-gw-dev.*healthy.*8101") {
             Write-Success "✅ Development Gateway: HEALTHY on port 8101"
-        } elseif ($container -match "accessibility-mw-prod.*healthy.*3001") {
+        }
+        elseif ($container -match "accessibility-mw-prod.*healthy.*3001") {
             Write-Success "✅ Middleware: HEALTHY on port 3001"
-        } elseif ($container -match "accessibility-redis.*healthy") {
+        }
+        elseif ($container -match "accessibility-redis.*healthy") {
             Write-Success "✅ Redis: HEALTHY"
         }
     }
@@ -611,13 +768,15 @@ function Test-SystemConsistency {
         if ($healthCheck.status -eq "Healthy") {
             Write-Success "✅ Gateway Health Check: PASSED"
         }
-    } catch {
+    }
+    catch {
         try {
             $healthCheck = Invoke-RestMethod -Uri "http://localhost:8101/health" -Method Get -TimeoutSec 5 2>$null
             if ($healthCheck.status -eq "Healthy") {
                 Write-Success "✅ Dev Gateway Health Check: PASSED"
             }
-        } catch {
+        }
+        catch {
             Write-Warning "⚠️ No Gateway responding on expected ports"
         }
     }
@@ -626,8 +785,10 @@ function Test-SystemConsistency {
     try {
         $middlewareTest = Invoke-RestMethod -Uri "http://localhost:3001/health" -Method Get -TimeoutSec 5 2>$null
         Write-Success "✅ Middleware: ACCESSIBLE"
-    } catch {
-        Write-Warning "⚠️ Middleware: NOT ACCESSIBLE"
+        Write-Info "  Status: $($middlewareTest.status)"
+    }
+    catch {
+        Write-Warning "⚠️ Middleware: NOT ACCESSIBLE - $($_.Exception.Message)"
     }
     
     Write-Success "System consistency check completed!"
@@ -647,6 +808,7 @@ try {
         'cleanup' { exit (Invoke-CleanupAction) }
         'run' { exit (Invoke-RunAction) }
         'consistency' { exit (Test-SystemConsistency) }
+        'status' { exit (Get-ProjectStatus) }
         'help' { Show-Help; exit 0 }
         default { 
             Write-Error "Unknown action: $Action"
@@ -654,7 +816,8 @@ try {
             exit 1
         }
     }
-} catch {
+}
+catch {
     Write-Error "Script execution failed: $($_.Exception.Message)"
     exit 1
 }

@@ -291,7 +291,8 @@
         <p>La mayoría de endpoints requieren autenticación JWT. Para probar la API:</p>
         <ol>
             <li>Usa el endpoint <code>POST /api/v1/translate</code> con servicio <code>users</code> y path
-                <code>/api/v1/auth/login</code></li>
+                <code>/api/v1/auth/login</code>
+            </li>
             <li>Copia el token de la respuesta</li>
             <li>Haz clic en "Authorize" arriba y pega: <code>Bearer &lt;tu-token&gt;</code></li>
             <li>Ya puedes usar todos los endpoints protegidos</li>
@@ -313,7 +314,7 @@
     <script>
         window.onload = function () {
             // Configuración de Swagger UI
-            const ui = SwaggerUIBundle({
+            SwaggerUIBundle({
                 url: './gateway-complete-api.yaml',
                 dom_id: '#swagger-ui',
                 deepLinking: true,
@@ -413,61 +414,61 @@
         // Función para mostrar ejemplos de uso
         function showUsageExamples() {
             const examples = `
-// Ejemplo 1: Autenticación
-fetch('/api/v1/translate', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        service: 'users',
-        method: 'POST',
-        path: '/api/v1/auth/login',
-        body: {
-            email: 'usuario@example.com',
-            password: 'password123'
-        }
-    })
-});
+                    // Ejemplo 1: Autenticación
+                    fetch('/api/v1/translate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            service: 'users',
+                            method: 'POST',
+                            path: '/api/v1/auth/login',
+                            body: {
+                                email: 'usuario@example.com',
+                                password: 'password123'
+                            }
+                        })
+                    });
 
-// Ejemplo 2: Análisis de URL
-fetch('/api/v1/translate', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer your-jwt-token'
-    },
-    body: JSON.stringify({
-        service: 'middleware',
-        method: 'POST',
-        path: '/api/v1/analyze/url',
-        body: {
-            url: 'https://example.com',
-            tools: ['axe', 'equalAccess'],
-            wcagLevel: 'AA',
-            includeScreenshot: true
-        }
-    })
-});
+                    // Ejemplo 2: Análisis de URL
+                    fetch('/api/v1/translate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer your-jwt-token'
+                        },
+                        body: JSON.stringify({
+                            service: 'middleware',
+                            method: 'POST',
+                            path: '/api/v1/analyze/url',
+                            body: {
+                                url: 'https://example.com',
+                                tools: ['axe', 'equalAccess'],
+                                wcagLevel: 'AA',
+                                includeScreenshot: true
+                            }
+                        })
+                    });
 
-// Ejemplo 3: Crear reporte
-fetch('/api/v1/translate', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer your-jwt-token'
-    },
-    body: JSON.stringify({
-        service: 'reports',
-        method: 'POST',
-        path: '/api/v1/reports',
-        body: {
-            title: 'Reporte de Accesibilidad',
-            description: 'Análisis completo de la homepage',
-            analysisId: 123
-        }
-    })
-});
+                    // Ejemplo 3: Crear reporte
+                    fetch('/api/v1/translate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer your-jwt-token'
+                        },
+                        body: JSON.stringify({
+                            service: 'reports',
+                            method: 'POST',
+                            path: '/api/v1/reports',
+                            body: {
+                                title: 'Reporte de Accesibilidad',
+                                description: 'Análisis completo de la homepage',
+                                analysisId: 123
+                            }
+                        })
+                    });
             `;
 
             console.log("Ejemplos de uso:", examples);
