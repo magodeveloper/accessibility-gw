@@ -258,6 +258,8 @@ public sealed class RequestTranslator
         Console.WriteLine($"=== SERVICE URL === {_opts.Services[req.Service]}");
         Console.WriteLine($"=== EXPECTED HOST === {actualExpectedHost}");
 
+        var act = req.Method.ToUpperInvariant();
+
         // Preparar el body como string si existe
         string? bodyString = null;
         if (req.Body != null && act != "GET" && act != "DELETE")
@@ -274,7 +276,6 @@ public sealed class RequestTranslator
         }
 
         var transformer = new CustomHostTransformer(actualExpectedHost, targetUri.ToString(), bodyString);
-        var act = req.Method.ToUpperInvariant();
 
         // Limpiar headers conflictivos
         context.Request.Headers.Remove("Host");
@@ -307,7 +308,7 @@ public sealed class RequestTranslator
             context.Request.ContentLength = 0;
         }
         // Para otros métodos, el body será manejado por el CustomHostTransformer
-        
+
         var requestConfig = new ForwarderRequestConfig
         {
             ActivityTimeout = TimeSpan.FromSeconds(_opts.DefaultTimeoutSeconds)
