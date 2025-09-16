@@ -1,44 +1,53 @@
+using Xunit;
+using FluentAssertions;
 using Gateway.Services;
+using Gateway.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Yarp.ReverseProxy.Forwarder;
+using System.Net.Http;
+using NSubstitute;
+using Microsoft.AspNetCore.Http;
 
-namespace Gateway.UnitTests.Services;
-
-public class RequestTranslatorTests
+namespace Gateway.UnitTests.Services
 {
-    [Theory]
-    [InlineData("GET")]
-    [InlineData("POST")]
-    [InlineData("PUT")]
-    [InlineData("DELETE")]
-    [InlineData("PATCH")]
-    public void RequestTranslator_Should_Handle_Valid_HttpMethods(string method)
+    public class RequestTranslatorTests
     {
-        // Act & Assert
-        Assert.Contains(method, new[] { "GET", "POST", "PUT", "DELETE", "PATCH" });
-    }
+        private readonly RequestTranslator _requestTranslator;
 
-    [Fact]
-    public void RequestTranslator_AllowedMethods_Should_Be_Valid()
-    {
-        // Arrange
-        var allowedMethods = new[] { "GET", "POST", "PUT", "PATCH", "DELETE" };
+        public RequestTranslatorTests()
+        {
+            var gateOptions = new GateOptions
+            {
+                Services = new Dictionary<string, string> { { "users", "http://localhost:5001" } },
+                AllowedRoutes = new List<AllowedRoute> { new AllowedRoute { Service = "users", Methods = new[] { "GET", "POST" }, PathPrefix = "/api/users" } }
+            };
 
-        // Act & Assert
-        Assert.Equal(5, allowedMethods.Length);
-        Assert.Contains("GET", allowedMethods);
-        Assert.Contains("POST", allowedMethods);
-        Assert.Contains("PUT", allowedMethods);
-        Assert.Contains("PATCH", allowedMethods);
-        Assert.Contains("DELETE", allowedMethods);
-    }
+            _requestTranslator = new RequestTranslator(
+                Options.Create(gateOptions),
+                Substitute.For<IHttpForwarder>(),
+                new HttpClient(),
+                Substitute.For<ICacheService>(),
+                Substitute.For<IMetricsService>(),
+                Substitute.For<IResiliencePolicyService>(),
+                Substitute.For<ILogger<RequestTranslator>>());
+        }
 
-    [Theory]
-    [InlineData("reports")]
-    [InlineData("users")]
-    [InlineData("analysis")]
-    public void RequestTranslator_Should_Handle_Valid_ServiceNames(string serviceName)
-    {
-        // Act & Assert
-        Assert.NotEmpty(serviceName);
-        Assert.Contains(serviceName, new[] { "reports", "users", "analysis" });
+        [Fact]
+        public void IsAllowed_ValidRequest_ShouldReturnTrue()
+        {
+            var request = new TranslateRequest { Service = "users", Method = "GET", Path = "/api/users/123" };
+            var result = _requestTranslator.IsAllowed(request);
+            result.Should().BeTrue();
+        }
+
+        [Fact]
+        public void IsAllowed_InvalidService_ShouldReturnFalse()
+        {
+            var request = new TranslateRequest { Service = "invalid", Method = "GET", Path = "/api/users/123" };
+            var result = _requestTranslator.IsAllowed(request);
+            result.Should().BeFalse();
+        }
+
     }
 }

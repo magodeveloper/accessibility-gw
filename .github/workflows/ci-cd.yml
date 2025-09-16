@@ -6,12 +6,16 @@ on:
     paths:
       - 'src/**'
       - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - 'Directory.Packages.props'
       - '.github/workflows/**'
   pull_request:
     branches: [main]
     paths:
       - 'src/**'
       - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - 'Directory.Packages.props'
       - '.github/workflows/**'
   release:
     types: [published]
@@ -20,6 +24,9 @@ env:
   DOTNET_VERSION: '9.0.x'
   IMAGE_NAME: accessibility-gateway
   REGISTRY: ghcr.io
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
 jobs:
   build-test:
@@ -47,20 +54,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-          restore-keys: ${{ runner.os }}-nuget-
+          key: ${{ runner.os }}-nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
-        run: |
-          dotnet restore src/Gateway/Gateway.csproj
-          dotnet restore src/tests/Gateway.UnitTests/Gateway.UnitTests.csproj
-          dotnet restore src/tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj
+        run: dotnet restore Gateway.sln
 
       - name: Build
-        run: |
-          dotnet build src/Gateway/Gateway.csproj --no-restore --configuration Release
-          dotnet build src/tests/Gateway.UnitTests/Gateway.UnitTests.csproj --no-restore --configuration Release
-          dotnet build src/tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj --no-restore --configuration Release
+        run: dotnet build Gateway.sln --no-restore --configuration Release
 
       - name: Run Unit Tests
         run: |
@@ -85,7 +87,7 @@ jobs:
           dotnet tool install --global dotnet-reportgenerator-globaltool || true
           reportgenerator \
             -reports:"TestResults/**/coverage.cobertura.xml" \
-            -targetdir:"TestResults/CoverageReport" \
+            -targetdir:"coverage-report" \
             -reporttypes:"Html;Cobertura"
 
       - name: Upload Test Results
@@ -161,8 +163,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./src
-          file: ./src/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -192,20 +194,35 @@ jobs:
         run: |
           docker network create test-network || true
           docker run -d --name test-redis --network test-network redis:7-alpine
+
+          # Usar la imagen construida en el job anterior
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}"
+          echo "Using image: $IMAGE_TAG"
+
           docker run -d --name test-gateway \
             --network test-network -p 8080:8080 \
             -e REDIS_CONNECTION_STRING="test-redis:6379" \
             -e ASPNETCORE_ENVIRONMENT="Testing" \
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            -e ASPNETCORE_URLS="http://+:8080" \
+            "$IMAGE_TAG"
 
       - name: Wait for services
-        run: timeout 60 sh -c 'until curl -f http://localhost:8080/health; do sleep 2; done'
+        run: |
+          echo "Waiting for Gateway to be ready..."
+          timeout 60 sh -c 'until curl -f http://localhost:8080/health/ready; do echo "Waiting..."; sleep 2; done'
+          echo "Gateway is ready!"
 
       - name: Run E2E tests
         run: |
-          curl -f http://localhost:8080/health || exit 1
+          echo "Running health checks..."
+          curl -f http://localhost:8080/health/live || exit 1
+          curl -f http://localhost:8080/health/ready || exit 1
           curl -f http://localhost:8080/metrics || exit 1
+
+          echo "Testing API endpoints..."
           curl -i http://localhost:8080/api/v1/users/health || echo "Expected: Upstream service not available"
+
+          echo "E2E tests completed successfully!"
 
       - name: Cleanup
         if: always()

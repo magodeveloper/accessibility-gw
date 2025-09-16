@@ -172,6 +172,90 @@ function Test-DockerRunning {
     }
 }
 
+function Test-RequiredNetwork {
+    Write-Step "Checking required Docker network..."
+    
+    # Verificar si Docker está corriendo
+    if (-not (Test-DockerRunning)) {
+        Write-Error "Docker is not running. Cannot verify network."
+        return $false
+    }
+    
+    # Verificar si la red accessibility-shared existe
+    try {
+        $network = docker network ls --filter name=accessibility-shared --format "{{.Name}}" 2>$null
+        if (-not $network -or $network -ne "accessibility-shared") {
+            Write-Warning "Network 'accessibility-shared' not found. Creating..."
+            
+            # Crear la red con configuración específica
+            docker network create `
+                --driver bridge `
+                --subnet=172.18.0.0/16 `
+                --gateway=172.18.0.1 `
+                accessibility-shared 2>$null
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Success "Network 'accessibility-shared' created successfully"
+                Write-Info "  Driver: bridge"
+                Write-Info "  Subnet: 172.18.0.0/16"
+                Write-Info "  Gateway: 172.18.0.1"
+                return $true
+            } 
+            else {
+                Write-Error "Failed to create network 'accessibility-shared'"
+                return $false
+            }
+        } 
+        else {
+            Write-Success "Network 'accessibility-shared' found and ready"
+            
+            # Mostrar información básica de la red
+            try {
+                $networkInfo = docker network inspect accessibility-shared --format "{{.Driver}} - {{range .IPAM.Config}}{{.Subnet}}{{end}}" 2>$null
+                if ($networkInfo) {
+                    Write-Info "  Network info: $networkInfo"
+                }
+            }
+            catch {
+                # Silenciar errores de inspect, no es crítico
+            }
+            
+            return $true
+        }
+    }
+    catch {
+        Write-Error "Error checking Docker network: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Test-NetworkConnectivity {
+    Write-Step "Testing network connectivity..."
+    
+    if (-not (Test-DockerRunning)) {
+        Write-Warning "Docker not running - skipping network connectivity tests"
+        return $true
+    }
+    
+    # Verificar contenedores conectados a la red
+    try {
+        $connectedContainers = docker network inspect accessibility-shared --format "{{range .Containers}}{{.Name}} {{end}}" 2>$null
+        if ($connectedContainers -and $connectedContainers.Trim()) {
+            $containerList = $connectedContainers.Trim() -split '\s+'
+            Write-Success "Found $($containerList.Count) containers connected to accessibility-shared:"
+            $containerList | ForEach-Object { Write-Info "  • $_" }
+        }
+        else {
+            Write-Info "No containers currently connected to accessibility-shared network"
+        }
+        return $true
+    }
+    catch {
+        Write-Warning "Could not inspect network connectivity: $($_.Exception.Message)"
+        return $true  # No es un error crítico
+    }
+}
+
 # ===========================================
 # FUNCIONES PRINCIPALES
 # ===========================================
@@ -286,6 +370,14 @@ function Invoke-DockerAction {
         return 1
     }
     
+    # Verificar red requerida antes de cualquier acción de Docker Compose
+    if ($SubAction -eq 'up' -or $SubAction -eq 'restart') {
+        if (-not (Test-RequiredNetwork)) {
+            Write-Error "Required Docker network validation failed. Cannot proceed with $SubAction."
+            return 1
+        }
+    }
+    
     $composeFile = if ($Environment -eq 'dev') { 'docker-compose.dev.yml' } else { 'docker-compose.yml' }
     
     switch ($SubAction) {
@@ -305,6 +397,12 @@ function Invoke-DockerAction {
             $cmd = "docker-compose -f $composeFile up -d --remove-orphans"
             if ($Rebuild) { $cmd += " --build" }
             Invoke-Expression $cmd
+            
+            # Verificar conectividad después de levantar contenedores
+            if ($LASTEXITCODE -eq 0) {
+                Start-Sleep -Seconds 3  # Dar tiempo a que los contenedores se conecten
+                Test-NetworkConnectivity
+            }
         }
         'down' {
             Write-Step "Stopping containers..."
@@ -363,10 +461,26 @@ function Invoke-VerifyAction {
         $dockerVersion = docker version --format '{{.Server.Version}}'
         Write-Success "Docker: $dockerVersion"
         $checks += @{ Name = "Docker"; Status = "✅"; Details = $dockerVersion }
+        
+        # Check Docker network when Docker is running
+        Write-Step "Checking Docker network..."
+        if (Test-RequiredNetwork) {
+            $checks += @{ Name = "Docker Network"; Status = "✅"; Details = "accessibility-shared ready" }
+            
+            # Test network connectivity if Full verification is requested
+            if ($Full) {
+                Test-NetworkConnectivity
+                $checks += @{ Name = "Network Connectivity"; Status = "✅"; Details = "Verified" }
+            }
+        }
+        else {
+            $checks += @{ Name = "Docker Network"; Status = "❌"; Details = "accessibility-shared missing" }
+        }
     }
     else {
         Write-Error "Docker not running"
         $checks += @{ Name = "Docker"; Status = "❌"; Details = "Not running" }
+        $checks += @{ Name = "Docker Network"; Status = "⚠️"; Details = "Cannot verify (Docker not running)" }
     }
     
     # Check project files
@@ -453,6 +567,35 @@ function Invoke-CleanupAction {
         if ($images) {
             Write-Step "Removing gateway images..."
             $images | ForEach-Object { docker rmi $_ -f }
+        }
+        
+        # Network cleanup (only if All is specified to avoid breaking other services)
+        if ($All) {
+            Write-Step "Checking network cleanup..."
+            try {
+                # Verificar si hay contenedores conectados a la red
+                $connectedContainers = docker network inspect accessibility-shared --format "{{range .Containers}}{{.Name}} {{end}}" 2>$null
+                if ($connectedContainers -and $connectedContainers.Trim()) {
+                    $containerList = $connectedContainers.Trim() -split '\s+'
+                    Write-Warning "Network 'accessibility-shared' has $($containerList.Count) connected containers:"
+                    $containerList | ForEach-Object { Write-Info "  • $_" }
+                    Write-Info "Network will not be removed to avoid disrupting other services."
+                    Write-Info "Use 'docker network disconnect' manually if needed."
+                }
+                else {
+                    Write-Step "Removing empty accessibility-shared network..."
+                    docker network rm accessibility-shared 2>$null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Success "Network 'accessibility-shared' removed"
+                    }
+                    else {
+                        Write-Info "Network 'accessibility-shared' not found or couldn't be removed"
+                    }
+                }
+            }
+            catch {
+                Write-Warning "Could not check/cleanup network: $($_.Exception.Message)"
+            }
         }
         
         if ($Volumes) {
@@ -616,20 +759,20 @@ EJEMPLOS DE DESARROLLO:
     .\manage-gateway.ps1 build -BuildType docker -Push -Registry myregistry.com
 
 🐳 DOCKER:
-    .\manage-gateway.ps1 docker up
+    .\manage-gateway.ps1 docker up          # Auto-verifica/crea red accessibility-shared
     .\manage-gateway.ps1 docker up -Environment dev
     .\manage-gateway.ps1 docker logs -Follow
     .\manage-gateway.ps1 docker status
     .\manage-gateway.ps1 docker down
 
 🔍 VERIFICATION:
-    .\manage-gateway.ps1 verify
-    .\manage-gateway.ps1 verify -Full
+    .\manage-gateway.ps1 verify              # Incluye verificación de red Docker
+    .\manage-gateway.ps1 verify -Full        # + tests de conectividad de red
 
 🧹 CLEANUP:
     .\manage-gateway.ps1 cleanup -Docker
     .\manage-gateway.ps1 cleanup -Docker -Volumes
-    .\manage-gateway.ps1 cleanup -All
+    .\manage-gateway.ps1 cleanup -All        # Incluye limpieza de red (si está vacía)
 
 🚀 LOCAL RUN (.NET DEVELOPMENT):
     .\manage-gateway.ps1 run

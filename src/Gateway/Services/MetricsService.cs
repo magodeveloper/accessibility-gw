@@ -5,7 +5,7 @@ namespace Gateway.Services;
 /// <summary>
 /// Servicio para manejo de métricas y telemetría
 /// </summary>
-public sealed class MetricsService
+public sealed class MetricsService : IMetricsService
 {
     private readonly ILogger<MetricsService> _logger;
     private static readonly ActivitySource ActivitySource = new("AccessibilityGateway");

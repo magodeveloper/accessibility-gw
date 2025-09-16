@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using System.ComponentModel.DataAnnotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -147,6 +148,36 @@ if (!string.IsNullOrWhiteSpace(authority))
     builder.Services.AddAuthorization();
 }
 
+// --- Validación de Input Avanzada ---
+builder.Services.AddSingleton<IInputSanitizationService, InputSanitizationService>();
+
+// Configurar validación automática de modelos
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+        var errors = context.ModelState
+            .Where(x => x.Value?.Errors.Count > 0)
+            .SelectMany(x => x.Value!.Errors.Select(e => new { Field = x.Key, Error = e.ErrorMessage }))
+            .ToList();
+
+        logger.LogWarning("Model validation failed for {Path}. Errors: {@Errors}",
+            context.HttpContext.Request.Path, errors);
+
+        var problemDetails = new ValidationProblemDetails(context.ModelState)
+        {
+            Title = "One or more validation errors occurred.",
+            Status = StatusCodes.Status400BadRequest,
+            Detail = "Please check the errors and try again.",
+            Instance = context.HttpContext.Request.Path
+        };
+
+        return new BadRequestObjectResult(problemDetails);
+    };
+});
+
 // --- Rate Limiting ---
 builder.Services.AddRateLimiter(opt =>
 {
@@ -196,8 +227,7 @@ builder.Services.AddOutputCache(o =>
 });
 
 // --- HttpClient con políticas de resiliencia ---
-// Nota: Las políticas de reintentos y circuit breaker están comentadas temporalmente
-// hasta que se resuelvan las dependencias de Polly
+// Políticas de reintentos y circuit breaker usando Polly para HttpClient tradicional
 
 builder.Services.AddHttpClient();
 builder.Services.AddHttpForwarder();
@@ -206,9 +236,9 @@ builder.Services.AddHttpClient("DefaultClient", (sp, client) =>
     var gateOptions = sp.GetRequiredService<IOptions<GateOptions>>().Value;
     client.Timeout = TimeSpan.FromSeconds(gateOptions.DefaultTimeoutSeconds);
 })
-.ConfigurePrimaryHttpMessageHandler(_ => new SocketsHttpHandler());
-//.AddPolicyHandler(GetRetryPolicy())
-//.AddPolicyHandler(GetCircuitBreakerPolicy());
+.ConfigurePrimaryHttpMessageHandler(_ => new SocketsHttpHandler())
+.AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetCircuitBreakerPolicy());
 
 // --- Servicios personalizados ---
 builder.Services.AddSingleton<HttpMessageInvoker>(provider =>
@@ -220,9 +250,10 @@ builder.Services.AddSingleton<HttpMessageInvoker>(provider =>
     };
     return new HttpMessageInvoker(handler);
 });
+builder.Services.AddSingleton<IResiliencePolicyService, ResiliencePolicyService>();
 builder.Services.AddSingleton<RequestTranslator>();
-builder.Services.AddSingleton<CacheService>();
-builder.Services.AddSingleton<MetricsService>();
+builder.Services.AddSingleton<ICacheService, CacheService>();
+builder.Services.AddSingleton<IMetricsService, MetricsService>();
 builder.Services.AddSingleton<ServiceHealthCheckFactory>();
 
 // --- Health Checks ---
@@ -249,13 +280,16 @@ if (!string.IsNullOrEmpty(redisConnectionString))
     healthChecksBuilder.AddRedis(redisConnectionString, name: "redis", tags: new[] { "ready" });
 }
 
-// UI de Health Checks
+// UI de Health Checks - Configuración mejorada para evitar concurrencia
 builder.Services.AddHealthChecksUI(opt =>
 {
-    opt.SetEvaluationTimeInSeconds(30);
-    opt.MaximumHistoryEntriesPerEndpoint(50);
-    opt.SetApiMaxActiveRequests(2);
+    opt.SetEvaluationTimeInSeconds(60); // Aumentar intervalo para reducir concurrencia
+    opt.MaximumHistoryEntriesPerEndpoint(25); // Reducir historial para menor carga
+    opt.SetApiMaxActiveRequests(1); // Una sola request activa para evitar "Sequence contains more than one element"
     opt.AddHealthCheckEndpoint("Gateway API", "/health");
+
+    // Configuración adicional para mejorar estabilidad
+    opt.SetMinimumSecondsBetweenFailureNotifications(300); // 5 minutos entre notificaciones
 })
 .AddInMemoryStorage();
 
@@ -271,6 +305,35 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// --- Security Headers Middleware ---
+app.Use(async (context, next) =>
+{
+    // Security headers esenciales para protección
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+
+    // HSTS solo en producción con HTTPS
+    if (app.Environment.IsProduction())
+    {
+        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload";
+    }
+
+    // Content Security Policy adaptado para API Gateway con Swagger
+    var cspPolicy = app.Environment.IsDevelopment()
+        ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
+        : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'";
+
+    context.Response.Headers["Content-Security-Policy"] = cspPolicy;
+
+    // Remover headers que revelan información del servidor
+    context.Response.Headers.Remove("Server");
+    context.Response.Headers.Remove("X-Powered-By");
+
+    await next();
+});
 
 // --- Middleware pipeline ---
 app.UseSerilogRequestLogging(options =>
@@ -413,28 +476,82 @@ app.Use(async (context, next) =>
 // --- Endpoints de la API ---
 
 app.MapPost("/api/v1/translate", async (
-    TranslateRequest req,
+    ValidatedTranslateRequest validatedReq,
     RequestTranslator translator,
     IOptions<GateOptions> opts,
+    IInputSanitizationService sanitizer,
     HttpContext http) =>
 {
-    // Validación de tamaño de payload
-    var max = opts.Value.MaxPayloadSizeBytes;
-    if (http.Request.ContentLength is long len && len > max)
-        return Results.Problem("Payload too large", statusCode: StatusCodes.Status413PayloadTooLarge);
-
-    // Validaciones de ACL
-    if (!translator.IsAllowed(req))
-        return Results.Problem("Route not allowed by ACL", statusCode: StatusCodes.Status403Forbidden);
-
-    // Propagar Authorization del cliente
-    if (http.Request.Headers.TryGetValue("Authorization", out var bearer))
+    try
     {
-        http.Request.Headers["Authorization"] = bearer.ToString();
-    }
+        Console.WriteLine($"=== TRANSLATE ENDPOINT DEBUG ===");
+        Console.WriteLine($"Service: {validatedReq.Service}");
+        Console.WriteLine($"Method: {validatedReq.Method}");
+        Console.WriteLine($"Path: {validatedReq.Path}");
+        Console.WriteLine($"Body: {validatedReq.Body}");
+        Console.WriteLine($"Body Length: {validatedReq.Body?.Length ?? 0}");
+        Console.WriteLine($"Content-Length: {http.Request.ContentLength}");
+        
+        // 1. Validación de tamaño de payload
+        var max = opts.Value.MaxPayloadSizeBytes;
+        if (http.Request.ContentLength is long len && len > max)
+            return Results.Problem("Payload too large", statusCode: StatusCodes.Status413PayloadTooLarge);
 
-    await translator.ForwardAsync(http, req, http.RequestAborted);
-    return Results.Empty;
+        // 2. Sanitización avanzada de inputs
+        var sanitizedPath = sanitizer.SanitizeApiPath(validatedReq.Path);
+        var sanitizedQuery = sanitizer.SanitizeQueryParameters(validatedReq.Query);
+        var sanitizedHeaders = sanitizer.ValidateAndSanitizeHeaders(validatedReq.Headers);
+
+        // 3. Validación de servicio permitido
+        var allowedServices = opts.Value.Services?.Keys ?? Enumerable.Empty<string>();
+        if (!sanitizer.IsValidService(validatedReq.Service, allowedServices))
+        {
+            return Results.Problem($"Service '{validatedReq.Service}' is not configured",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        // 4. Crear request sanitizado
+        var sanitizedReq = new TranslateRequest
+        {
+            Service = validatedReq.Service,
+            Method = validatedReq.Method.ToUpperInvariant(),
+            Path = sanitizedPath,
+            Query = sanitizedQuery,
+            Headers = sanitizedHeaders,
+            Body = validatedReq.Body // ¡SOLUCIÓN: Asignar el Body!
+        };
+
+        Console.WriteLine($"=== SANITIZED REQUEST ===");
+        Console.WriteLine($"Service: {sanitizedReq.Service}");
+        Console.WriteLine($"Method: {sanitizedReq.Method}");
+        Console.WriteLine($"Path: {sanitizedReq.Path}");
+        Console.WriteLine($"Body: {sanitizedReq.Body}");
+        Console.WriteLine($"Body Type: {sanitizedReq.Body?.GetType().Name ?? "null"}");
+        Console.WriteLine($"=== END SANITIZED REQUEST ===");
+
+        // 5. Validaciones de ACL
+        if (!translator.IsAllowed(sanitizedReq))
+            return Results.Problem("Route not allowed by ACL", statusCode: StatusCodes.Status403Forbidden);
+
+        // 6. Propagar Authorization del cliente (sanitizado)
+        if (http.Request.Headers.TryGetValue("Authorization", out var bearer))
+        {
+            var sanitizedBearer = sanitizer.SanitizeString(bearer.ToString());
+            sanitizedReq.Headers["Authorization"] = sanitizedBearer;
+        }
+
+        // 7. Forward con request sanitizado
+        await translator.ForwardAsync(http, sanitizedReq, http.RequestAborted);
+        return Results.Empty;
+    }
+    catch (SecurityException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+    }
 })
 .WithName("TranslateRequest")
 .WithSummary("Traduce y envía peticiones a microservicios")
@@ -480,7 +597,7 @@ app.MapMethods("/api/v1/services/{service}/{**path}",
 app.MapGet("/health", async ([FromServices] IServiceProvider sp, [FromQuery] bool deep = false, [FromQuery] bool includeMetrics = false) =>
 {
     var healthCheckService = sp.GetRequiredService<HealthCheckService>();
-    var metricsService = sp.GetRequiredService<MetricsService>();
+    var metricsService = sp.GetRequiredService<IMetricsService>();
 
     var options = new HealthCheckOptions
     {
@@ -547,7 +664,7 @@ app.MapGet("/health/ready", async (IServiceProvider sp) =>
 .WithTags("Health");
 
 // --- Métricas ---
-app.MapGet("/metrics", (MetricsService metricsService) =>
+app.MapGet("/metrics", ([FromServices] IMetricsService metricsService) =>
 {
     var metrics = metricsService.GetMetrics();
     return Results.Ok(metrics);
@@ -558,7 +675,7 @@ app.MapGet("/metrics", (MetricsService metricsService) =>
 .WithTags("Metrics")
 .CacheOutput();
 
-app.MapPost("/metrics/reset", (MetricsService metricsService) =>
+app.MapPost("/metrics/reset", ([FromServices] IMetricsService metricsService) =>
 {
     metricsService.ResetMetrics();
     return Results.Ok(new { message = "Metrics reset successfully", timestamp = DateTimeOffset.UtcNow });
@@ -569,14 +686,37 @@ app.MapPost("/metrics/reset", (MetricsService metricsService) =>
 .WithTags("Metrics");
 
 // --- Gestión de caché ---
-app.MapDelete("/cache/{service}", async (string service, CacheService cacheService) =>
+app.MapDelete("/cache/{service}", async (
+    string service,
+    [FromServices] ICacheService cacheService,
+    [FromServices] IInputSanitizationService sanitizer,
+    [FromServices] IOptions<GateOptions> opts) =>
 {
-    await cacheService.InvalidateServiceCacheAsync(service);
-    return Results.Ok(new { message = $"Cache invalidated for service: {service}" });
+    try
+    {
+        // 1. Validar y sanitizar el nombre del servicio
+        var sanitizedService = sanitizer.SanitizeString(service);
+
+        // 2. Validar que el servicio esté configurado
+        var allowedServices = opts.Value.Services?.Keys ?? Enumerable.Empty<string>();
+        if (!sanitizer.IsValidService(sanitizedService, allowedServices))
+        {
+            return Results.Problem($"Service '{sanitizedService}' is not configured",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        // 3. Invalidar caché
+        await cacheService.InvalidateServiceCacheAsync(sanitizedService);
+        return Results.Ok(new { message = $"Cache invalidated for service: {sanitizedService}" });
+    }
+    catch (Exception)
+    {
+        return Results.Problem("Error invalidating cache", statusCode: StatusCodes.Status500InternalServerError);
+    }
 })
 .WithName("InvalidateCache")
 .WithSummary("Invalida caché por servicio")
-.WithDescription("Invalida el caché para un servicio específico")
+.WithDescription("Invalida el caché para un servicio específico configurado")
 .WithTags("Cache");
 
 // --- Información del gateway ---
@@ -612,6 +752,41 @@ app.UseExceptionHandler("/error");
 app.Map("/error", () => Results.Problem("An error occurred processing your request"));
 
 app.Run();
+
+// Políticas de resiliencia de Polly
+static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+{
+    return HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .WaitAndRetryAsync(
+            retryCount: 3,
+            sleepDurationProvider: retryAttempt =>
+                TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) // Exponential backoff
+                + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 100)), // Jitter
+            onRetry: (outcome, timespan, retryCount, context) =>
+            {
+                var logger = context.GetValueOrDefault("logger") as Microsoft.Extensions.Logging.ILogger;
+                logger?.LogWarning("Retry attempt {RetryCount} for {OperationKey} in {Delay}ms",
+                    retryCount, context.OperationKey, timespan.TotalMilliseconds);
+            });
+}
+
+static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
+{
+    return HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .CircuitBreakerAsync(
+            handledEventsAllowedBeforeBreaking: 3,
+            durationOfBreak: TimeSpan.FromSeconds(30),
+            onBreak: (exception, timespan) =>
+            {
+                Console.WriteLine($"Circuit breaker opened for {timespan.TotalSeconds} seconds due to {exception.GetType().Name}");
+            },
+            onReset: () =>
+            {
+                Console.WriteLine("Circuit breaker reset");
+            });
+}
 
 // Hacer el tipo Program parcial para los tests
 public partial class Program { }

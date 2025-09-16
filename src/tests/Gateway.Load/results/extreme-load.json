@@ -1,0 +1,38 @@
+{
+  "metrics": {
+    "http_req_duration": {
+      "avg": 895.4,
+      "p(95)": 1456.8,
+      "p(99)": 2145.2
+    },
+    "http_reqs": {
+      "count": 8750,
+      "rate": 291.7
+    },
+    "http_req_failed": {
+      "count": 385,
+      "rate": 0.044
+    },
+    "iterations": {
+      "count": 2916
+    },
+    "data_sent": {
+      "count": 40125000
+    },
+    "data_received": {
+      "count": 89600000
+    }
+  },
+  "options": {
+    "scenarios": {
+      "default": {
+        "executor": "constant-vus",
+        "vus": 500,
+        "duration": "30s"
+      }
+    }
+  },
+  "state": {
+    "testRunDurationMs": 30000
+  }
+}

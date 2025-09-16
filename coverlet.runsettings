@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <OutputDirectory>../../TestResults</OutputDirectory>
+          <Threshold>90</Threshold>
+          <ThresholdType>line</ThresholdType>
+          <ExcludeByFile>
+            **/*AssemblyInfo.cs
+            **/*GlobalUsings.g.cs
+            **/bin/**
+            **/obj/**
+            **/Migrations/**
+            **/*.Designer.cs
+          </ExcludeByFile>
+          <ExcludeByAssembly>
+            Gateway.Tests.*
+            Gateway.UnitTests
+            Gateway.IntegrationTests
+            Gateway.Load
+          </ExcludeByAssembly>
+          <Exclude>
+            [Gateway]*.Program.&lt;Main&gt;$*
+            [Gateway]*CustomHostTransformer*Console.WriteLine*
+          </Exclude>
+          <Include>
+            [Gateway]*
+            [Gateway.Services]*
+            [Gateway.Models]*
+          </Include>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

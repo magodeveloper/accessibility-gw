@@ -20,8 +20,9 @@ public sealed class RequestTranslator
     private readonly GateOptions _opts;
     private readonly IHttpForwarder _forwarder;
     private readonly HttpMessageInvoker _httpClient;
-    private readonly CacheService _cacheService;
-    private readonly MetricsService _metricsService;
+    private readonly ICacheService _cacheService;
+    private readonly IMetricsService _metricsService;
+    private readonly IResiliencePolicyService _resiliencePolicyService;
     private readonly ILogger<RequestTranslator> _logger;
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web)
     {
@@ -32,8 +33,9 @@ public sealed class RequestTranslator
         IOptions<GateOptions> opts,
         IHttpForwarder forwarder,
         HttpMessageInvoker httpClient,
-        CacheService cacheService,
-        MetricsService metricsService,
+    ICacheService cacheService,
+    IMetricsService metricsService,
+        IResiliencePolicyService resiliencePolicyService,
         ILogger<RequestTranslator> logger)
     {
         _opts = opts.Value;
@@ -41,6 +43,7 @@ public sealed class RequestTranslator
         _httpClient = httpClient;
         _cacheService = cacheService;
         _metricsService = metricsService;
+        _resiliencePolicyService = resiliencePolicyService;
         _logger = logger;
     }
 
@@ -167,10 +170,18 @@ public sealed class RequestTranslator
         {
             _logger.LogInformation("Forwarding request {Service}:{Method}:{Path}", req.Service, req.Method, req.Path);
 
-            // Llamar directamente al método que maneja YARP
+            // Log políticas de resiliencia configuradas
+            var config = _resiliencePolicyService.GetConfigForService(req.Service);
+            _logger.LogDebug("Using resilience config for {Service}: RetryCount={RetryCount}, Timeout={Timeout}s",
+                req.Service, config.RetryCount, config.OverallTimeout.TotalSeconds);
+
+            // Llamar directamente al método que maneja YARP (mantiene compatibilidad)
             var result = await ForwardRequestAsync(context, req, ct);
 
             stopwatch.Stop();
+
+            _logger.LogInformation("ForwardRequestAsync result: Error={Error}, Response={Response}, ResponseStatusCode={StatusCode}",
+                result.Error?.Message, result.Response != null, result.Response?.StatusCode);
 
             if (result.Error != null)
             {
@@ -190,16 +201,33 @@ public sealed class RequestTranslator
 
                 _metricsService.RecordRequest(req.Service, req.Method, result.Error.StatusCode ?? 500, stopwatch.Elapsed.TotalMilliseconds);
             }
-            else
+            else if (result.Response != null)
             {
-                // La respuesta exitosa ya fue escrita por YARP
+                // Caso exitoso: la respuesta ya fue escrita por YARP en ForwardRequestAsync
+                // El StatusCode ya debe estar establecido por YARP, pero si no es válido, usar el del resultado
+                if (context.Response.StatusCode == 0 || !IsValidStatusCode(context.Response.StatusCode))
+                {
+                    context.Response.StatusCode = result.Response.StatusCode;
+                }
+
                 _logger.LogInformation("Request forwarded successfully {Service}:{Method}:{Path}", req.Service, req.Method, req.Path);
                 _metricsService.RecordRequest(req.Service, req.Method, context.Response.StatusCode, stopwatch.Elapsed.TotalMilliseconds);
+            }
+            else
+            {
+                // Caso donde no hay error ni response - algo inesperado
+                context.Response.StatusCode = 500;
+                context.Response.ContentType = "application/json";
+                var errorResponse = new { error = new { message = "Unexpected empty result from ForwardRequestAsync" } };
+                await context.Response.WriteAsync(JsonSerializer.Serialize(errorResponse, _json), ct);
+                _metricsService.RecordRequest(req.Service, req.Method, 500, stopwatch.Elapsed.TotalMilliseconds);
             }
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
+            Console.WriteLine($"=== EXCEPTION IN FORWARDASYNC === {ex.Message}");
+            Console.WriteLine($"=== EXCEPTION STACK TRACE === {ex.StackTrace}");
             _logger.LogError(ex, "Error forwarding request {Service}:{Method}:{Path}", req.Service, req.Method, req.Path);
 
             context.Response.StatusCode = 500;
@@ -230,7 +258,22 @@ public sealed class RequestTranslator
         Console.WriteLine($"=== SERVICE URL === {_opts.Services[req.Service]}");
         Console.WriteLine($"=== EXPECTED HOST === {actualExpectedHost}");
 
-        var transformer = new CustomHostTransformer(actualExpectedHost, targetUri.ToString());
+        // Preparar el body como string si existe
+        string? bodyString = null;
+        if (req.Body != null && act != "GET" && act != "DELETE")
+        {
+            if (req.Body is string stringBody)
+            {
+                bodyString = stringBody;
+            }
+            else
+            {
+                bodyString = JsonSerializer.Serialize(req.Body, _json);
+            }
+            Console.WriteLine($"=== BODY PREPARED FOR TRANSFORMER === Length: {bodyString.Length}");
+        }
+
+        var transformer = new CustomHostTransformer(actualExpectedHost, targetUri.ToString(), bodyString);
         var act = req.Method.ToUpperInvariant();
 
         // Limpiar headers conflictivos
@@ -257,21 +300,14 @@ public sealed class RequestTranslator
         // Sustituir método HTTP
         context.Features.Get<IHttpRequestFeature>()!.Method = act;
 
-        // Preparar body
+        // Para métodos GET y DELETE, limpiar el body
         if (act is "GET" or "DELETE")
         {
             context.Request.Body = Stream.Null;
             context.Request.ContentLength = 0;
         }
-        else if (req.Body != null)
-        {
-            var json = JsonSerializer.Serialize(req.Body, _json);
-            var bytes = Encoding.UTF8.GetBytes(json);
-            context.Request.Body = new MemoryStream(bytes);
-            context.Request.ContentLength = bytes.Length;
-            context.Request.ContentType ??= "application/json";
-        }
-
+        // Para otros métodos, el body será manejado por el CustomHostTransformer
+        
         var requestConfig = new ForwarderRequestConfig
         {
             ActivityTimeout = TimeSpan.FromSeconds(_opts.DefaultTimeoutSeconds)
@@ -286,6 +322,8 @@ public sealed class RequestTranslator
         Console.WriteLine($"Error: {error}");
         Console.WriteLine($"Response StatusCode: {context.Response.StatusCode}");
         Console.WriteLine($"Response Headers: {string.Join(", ", context.Response.Headers.Select(h => $"{h.Key}:{h.Value}"))}");
+
+        _logger.LogInformation("YARP SendAsync result: Error={Error}, ContextStatusCode={StatusCode}", error, context.Response.StatusCode);
 
         if (error != ForwarderError.None)
         {
@@ -349,17 +387,24 @@ public sealed class RequestTranslator
 
         return forbiddenHeaders.Contains(headerName.ToLowerInvariant());
     }
+
+    private static bool IsValidStatusCode(int statusCode)
+    {
+        return statusCode >= 100 && statusCode < 600;
+    }
 }
 
 public class CustomHostTransformer : HttpTransformer
 {
     private readonly string _expectedHost;
     private readonly string _targetUri;
+    private readonly string? _requestBody;
 
-    public CustomHostTransformer(string expectedHost, string targetUri)
+    public CustomHostTransformer(string expectedHost, string targetUri, string? requestBody = null)
     {
         _expectedHost = expectedHost;
         _targetUri = targetUri;
+        _requestBody = requestBody;
     }
 
     public override async ValueTask TransformRequestAsync(HttpContext httpContext, HttpRequestMessage proxyRequest, string destinationPrefix, CancellationToken cancellationToken)
@@ -371,6 +416,14 @@ public class CustomHostTransformer : HttpTransformer
 
         // Establecer la URI de destino manualmente
         proxyRequest.RequestUri = new Uri(_targetUri);
+
+        // Si tenemos un body personalizado, usarlo
+        if (!string.IsNullOrEmpty(_requestBody) && proxyRequest.Method != HttpMethod.Get && proxyRequest.Method != HttpMethod.Delete)
+        {
+            var content = new StringContent(_requestBody, System.Text.Encoding.UTF8, "application/json");
+            proxyRequest.Content = content;
+            Console.WriteLine($"=== CUSTOM TRANSFORMER SET BODY === Length: {_requestBody.Length}");
+        }
 
         Console.WriteLine($"=== CUSTOM TRANSFORMER SET HOST === {_expectedHost}");
         Console.WriteLine($"=== PROXY REQUEST URI === {proxyRequest.RequestUri}");

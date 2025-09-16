@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gateway.Tests.Basic", "Gateway.Tests.Basic\Gateway.Tests.Basic.csproj", "{6286FB8F-B799-4FD7-B1C4-089748C1C18F}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gateway.UnitTests", "Gateway.UnitTests\Gateway.UnitTests.csproj", "{34E06006-866E-4154-98FC-7C46852BC051}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gateway.IntegrationTests", "Gateway.IntegrationTests\Gateway.IntegrationTests.csproj", "{FE188562-9E39-4B3E-A920-649334D4AD45}"
@@ -18,10 +16,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{6286FB8F-B799-4FD7-B1C4-089748C1C18F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6286FB8F-B799-4FD7-B1C4-089748C1C18F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6286FB8F-B799-4FD7-B1C4-089748C1C18F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6286FB8F-B799-4FD7-B1C4-089748C1C18F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{34E06006-866E-4154-98FC-7C46852BC051}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{34E06006-866E-4154-98FC-7C46852BC051}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{34E06006-866E-4154-98FC-7C46852BC051}.Release|Any CPU.ActiveCfg = Release|Any CPU

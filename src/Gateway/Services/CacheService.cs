@@ -7,7 +7,7 @@ namespace Gateway.Services;
 /// <summary>
 /// Servicio para manejo de caché distribuido
 /// </summary>
-public sealed class CacheService
+public sealed class CacheService : ICacheService
 {
     private readonly IDistributedCache _cache;
     private readonly ILogger<CacheService> _logger;
