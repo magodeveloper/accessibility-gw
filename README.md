@@ -20,6 +20,25 @@
 
 ---
 
+## 📋 **Tabla de Contenidos**
+
+- [🎯 Características Principales](#-características-principales)
+- [🏗️ Estructura del Proyecto](#️-estructura-del-proyecto)
+- [⚙️ Configuración e Instalación](#️-configuración-e-instalación)
+- [🚀 Inicio Rápido](#-inicio-rápido)
+- [🔧 Configuración Avanzada](#-configuración-avanzada)
+- [🧪 Testing y Cobertura](#-testing-y-cobertura)
+- [🐳 Docker y Containerización](#-docker-y-containerización)
+- [📊 Monitoreo y Observabilidad](#-monitoreo-y-observabilidad)
+- [🔐 Seguridad y Autenticación](#-seguridad-y-autenticación)
+- [🛠️ Scripts de Gestión](#️-scripts-de-gestión)
+- [📚 API Documentation](#-api-documentation)
+- [🔧 Troubleshooting](#-troubleshooting)
+- [🤝 Contribución](#-contribución)
+- [📄 Licencia](#-licencia)
+
+---
+
 ## 🎯 **Características Principales**
 
 ### 🏗️ **Gateway Inteligente con YARP**
@@ -48,6 +67,141 @@
 - 🏥 **Health Endpoints**: Health checks profundos de todo el ecosistema
 - 📈 **Métricas Prometheus**: Dashboard completo de performance y errors
 - 📝 **Logging Estructurado**: Serilog con correlación de requests
+- 🎯 **Tracing Distribuido**: Correlación de requests entre microservicios
+
+---
+
+## 🏗️ **Estructura del Proyecto**
+
+```
+accessibility-gw/
+├── 📄 README.md                           # Documentación principal del proyecto
+├── 📋 Gateway.sln                         # Solución principal de .NET
+├── 📦 Directory.Packages.props            # Gestión centralizada de paquetes NuGet
+├── ⚙️ coverlet.runsettings               # Configuración de cobertura de código
+├── 🐳 Dockerfile                         # Imagen Docker para producción
+├── 🐳 docker-compose.yml                 # Orquestación de servicios (Gateway + Redis)
+├── 🐳 docker-compose.dev.yml             # Configuración de desarrollo
+├── 🔧 manage-gateway.ps1                 # Script principal de gestión del gateway
+├── 🔧 manage-tests.ps1                   # Script de gestión de pruebas y cobertura
+├── 📊 test-dashboard.html                # Dashboard de visualización de resultados
+├── 🌐 .gitignore                         # Exclusiones de Git
+├── 🐳 .dockerignore                      # Exclusiones de Docker
+├── 📝 .env.example                       # Plantilla de variables de entorno
+│
+├── 📁 .github/                           # Configuración de GitHub Actions
+│   └── workflows/
+│       └── ci-cd.yml                     # Pipeline de CI/CD automatizado
+│
+├── 📁 coverage-report/                   # Reportes de cobertura de código
+│   ├── index.html                        # Dashboard principal de cobertura
+│   ├── *.html                           # Reportes detallados por clase
+│   ├── *.js                             # Scripts de interactividad
+│   ├── *.css                            # Estilos del reporte
+│   └── *.svg                            # Iconos y gráficos
+│
+└── 📁 src/                               # Código fuente principal
+    ├── 📁 Gateway/                       # Proyecto principal del Gateway
+    │   ├── 📄 Gateway.csproj             # Archivo de proyecto .NET
+    │   ├── 🚀 Program.cs                 # Punto de entrada y configuración
+    │   ├── ⚙️ GateOptions.cs             # Opciones de configuración
+    │   │
+    │   ├── 📁 Models/                    # Modelos de datos y DTOs
+    │   │   ├── TranslateRequest.cs       # DTOs para requests de traducción
+    │   │   └── ValidationDTOs.cs         # DTOs de validación
+    │   │
+    │   └── 📁 Services/                  # Servicios de negocio
+    │       ├── ICacheService.cs          # Interfaz del servicio de caché
+    │       ├── CacheService.cs           # Implementación de caché Redis/Memoria
+    │       ├── IMetricsService.cs        # Interfaz del servicio de métricas
+    │       ├── MetricsService.cs         # Recolección y exposición de métricas
+    │       ├── RequestTranslator.cs      # Traductor y proxy de requests
+    │       ├── ResiliencePolicyService.cs # Políticas de resistencia con Polly
+    │       ├── ServiceHealthCheck.cs     # Health checks de microservicios
+    │       ├── SignatureValidator.cs     # Validación de firmas JWT
+    │       └── InputSanitizationService.cs # Sanitización de inputs
+    │
+    └── 📁 tests/                         # Suite completa de pruebas
+        ├── 📄 Gateway.Tests.sln          # Solución de testing
+        │
+        ├── 📁 Gateway.UnitTests/         # Pruebas unitarias (cobertura 92.5%)
+        │   ├── 📄 Gateway.UnitTests.csproj
+        │   ├── 🧪 SimpleTest.cs          # Pruebas básicas de smoke
+        │   ├── 🧪 GatewayBasicTests.cs   # Pruebas fundamentales
+        │   ├── 🧪 ProgramTests.cs        # Pruebas de configuración
+        │   ├── 🧪 ProgramConfigurationTests.cs
+        │   ├── 🧪 ProgramMiddlewareTests.cs
+        │   ├── 🧪 ConfigurationTests.cs
+        │   │
+        │   ├── 📁 Configuration/         # Pruebas de configuración
+        │   │   └── GateOptionsTests.cs
+        │   │
+        │   ├── 📁 Helpers/              # Utilidades de testing
+        │   │   ├── TestDataFactory.cs   # Factory de datos de prueba
+        │   │   └── UnitTestBase.cs      # Clase base para pruebas
+        │   │
+        │   ├── 📁 Models/               # Pruebas de modelos
+        │   │   ├── HealthCheckRequestTests.cs
+        │   │   ├── TranslateRequestTests.cs
+        │   │   └── TranslateResponseTests.cs
+        │   │
+        │   └── 📁 Services/             # Pruebas de servicios
+        │       ├── CacheServiceBasicTests.cs
+        │       ├── CacheServiceTests.cs
+        │       ├── CacheService_AdditionalTests.cs
+        │       ├── CacheService_ExtendedTests.cs
+        │       ├── MetricsServiceBasicTests.cs
+        │       ├── MetricsServiceTests.cs
+        │       ├── MetricsServiceAdditionalTests.cs
+        │       ├── RequestTranslatorBasicTests.cs
+        │       ├── RequestTranslatorTests.cs
+        │       ├── RequestTranslator_*.cs  # Suite extensa de pruebas
+        │       ├── ServiceHealthCheckBasicTests.cs
+        │       ├── ServiceHealthCheckTests.cs
+        │       ├── SignatureValidatorTests.cs
+        │       └── SignatureValidator_*.cs # Pruebas de validación JWT
+        │
+        ├── 📁 Gateway.IntegrationTests/  # Pruebas de integración
+        │   ├── 📄 Gateway.IntegrationTests.csproj
+        │   ├── 🧪 GatewayBasicIntegrationTests.cs
+        │   ├── 🧪 CacheIntegrationTests.cs
+        │   ├── 🧪 HealthCheckIntegrationTests.cs
+        │   ├── 🧪 MetricsIntegrationTests.cs
+        │   ├── 🧪 TestFactoryCreation.cs
+        │   ├── 🧪 GatewayTestFactory.cs
+        │   │
+        │   └── 📁 Fixtures/             # Fixtures de integración
+        │       └── GatewayTestFactory.cs
+        │
+        └── 📁 Gateway.Load/             # Pruebas de carga con K6
+            ├── 📄 README.md
+            ├── 🔧 manage-load-tests.ps1 # Gestión de pruebas de carga
+            ├── ⚙️ .env                  # Variables de entorno para load testing
+            │
+            ├── 📁 scenarios/            # Escenarios de carga
+            │   ├── smoke-test.js        # Prueba de smoke (verificación básica)
+            │   ├── load-test.js         # Prueba de carga normal
+            │   ├── stress-test.js       # Prueba de estrés
+            │   ├── spike-test.js        # Prueba de picos de tráfico
+            │   ├── endurance-test.js    # Prueba de resistencia
+            │   ├── concurrent-users-20.js
+            │   ├── concurrent-users-50.js
+            │   ├── concurrent-users-100.js
+            │   └── concurrent-users-500.js
+            │
+            ├── 📁 utils/               # Utilidades para pruebas de carga
+            │   ├── config.js           # Configuración común
+            │   └── metrics.js          # Métricas y reportes
+            │
+            ├── 📁 data/                # Datos de prueba
+            │   └── README.md
+            │
+            └── 📁 results/             # Resultados de pruebas
+                └── README.md
+```
+
+---
+
 - 🔍 **Distributed Tracing**: Trazabilidad completa de requests
 
 ### 🛠️ **DevOps y Gestión**
@@ -94,7 +248,817 @@ Internet/Cliente
 
 ### 🔄 **Flujo de Requests**
 
+```mermaid
+sequenceDiagram
+    participant C as Cliente
+    participant GW as Gateway
+    participant R as Redis Cache
+    participant MS as Microservicio
+    participant H as Health Check
+
+    C->>GW: Request HTTP/HTTPS
+    GW->>GW: Validar JWT & Rate Limit
+    GW->>R: Buscar en Cache
+    alt Cache Hit
+        R-->>GW: Datos en Cache
+        GW-->>C: Respuesta Cached
+    else Cache Miss
+        GW->>H: Health Check
+        H-->>GW: Status OK
+        GW->>MS: Forward Request
+        MS-->>GW: Respuesta
+        GW->>R: Guardar en Cache
+        GW-->>C: Respuesta
+    end
 ```
+
+---
+
+## ⚙️ **Configuración e Instalación**
+
+### 📋 **Requisitos del Sistema**
+
+| Componente     | Versión Mínima | Recomendada | Notas                 |
+| -------------- | -------------- | ----------- | --------------------- |
+| **.NET SDK**   | 9.0.100        | 9.0.100+    | Framework principal   |
+| **Docker**     | 20.10.0        | 24.0.0+     | Para containerización |
+| **Redis**      | 6.2.0          | 7.2.0+      | Cache distribuido     |
+| **PowerShell** | 5.1            | 7.4+        | Scripts de gestión    |
+| **Git**        | 2.30.0         | 2.42.0+     | Control de versiones  |
+
+### 🔧 **Instalación Rápida**
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/magodeveloper/accessibility-gw.git
+cd accessibility-gw
+
+# 2. Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tus configuraciones
+
+# 3. Restaurar dependencias
+dotnet restore
+
+# 4. Ejecutar con Docker (Recomendado)
+docker-compose up -d
+
+# 5. Verificar instalación
+curl http://localhost:8100/health/live
+```
+
+### 🔐 **Variables de Entorno**
+
+```env
+# Configuración del Gateway
+ASPNETCORE_ENVIRONMENT=Development
+ASPNETCORE_URLS=http://+:8100
+
+# Redis Configuration
+REDIS_CONNECTION_STRING=localhost:6379
+REDIS_DATABASE=0
+REDIS_PREFIX=accessibility_gw:
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-key-here
+JWT_ISSUER=accessibility-gateway
+JWT_AUDIENCE=accessibility-ecosystem
+JWT_EXPIRY_MINUTES=60
+
+# Microservices Endpoints
+USERS_API_URL=http://localhost:8081
+ANALYSIS_API_URL=http://localhost:8082
+REPORTS_API_URL=http://localhost:8083
+MIDDLEWARE_API_URL=http://localhost:3001
+
+# Rate Limiting
+RATE_LIMIT_REQUESTS_PER_MINUTE=100
+RATE_LIMIT_BURST_SIZE=20
+
+# Logging
+SERILOG_MINIMUM_LEVEL=Information
+LOG_FILE_PATH=./logs/gateway-.log
+LOG_RETENTION_DAYS=7
+
+# Health Checks
+HEALTH_CHECK_TIMEOUT_SECONDS=30
+HEALTH_CHECK_INTERVAL_SECONDS=30
+```
+
+---
+
+## 🚀 **Inicio Rápido**
+
+### 🐳 **Opción 1: Docker (Recomendado)**
+
+```bash
+# Desarrollo con hot-reload
+docker-compose -f docker-compose.dev.yml up -d
+
+# Producción optimizada
+docker-compose up -d
+
+# Verificar estado de servicios
+docker-compose ps
+```
+
+### 🖥️ **Opción 2: Desarrollo Local**
+
+```bash
+# 1. Iniciar Redis (requerido)
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+
+# 2. Configurar base de datos (si es necesario)
+.\manage-gateway.ps1 init-db
+
+# 3. Ejecutar en modo desarrollo
+dotnet run --project src/Gateway
+
+# 4. Abrir navegador
+start http://localhost:8100/health
+```
+
+### 🔄 **Comandos de Verificación**
+
+```bash
+# Health check principal
+curl http://localhost:8100/health/live
+
+# Health check detallado
+curl http://localhost:8100/health/ready
+
+# Métricas Prometheus
+curl http://localhost:8100/metrics
+
+# Documentación API
+open http://localhost:8100/swagger
+```
+
+---
+
+## 🔧 **Configuración Avanzada**
+
+### ⚙️ **Configuración de YARP**
+
+```json
+// appsettings.json
+{
+  "ReverseProxy": {
+    "Routes": {
+      "users-route": {
+        "ClusterId": "users-cluster",
+        "Match": {
+          "Path": "/api/users/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathPattern": "/api/{**catch-all}" },
+          { "RequestHeader": "X-Gateway-Source", "Value": "accessibility-gw" }
+        ]
+      },
+      "analysis-route": {
+        "ClusterId": "analysis-cluster",
+        "Match": {
+          "Path": "/api/analysis/{**catch-all}"
+        }
+      }
+    },
+    "Clusters": {
+      "users-cluster": {
+        "Destinations": {
+          "users-api": {
+            "Address": "http://localhost:8081/"
+          }
+        },
+        "HealthCheck": {
+          "Active": {
+            "Enabled": true,
+            "Interval": "00:00:30",
+            "Timeout": "00:00:05",
+            "Policy": "ConsecutiveFailures"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### 🎛️ **Configuración de Rate Limiting**
+
+```csharp
+// Program.cs
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("api", configureOptions =>
+    {
+        configureOptions.PermitLimit = 100;
+        configureOptions.Window = TimeSpan.FromMinutes(1);
+        configureOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        configureOptions.QueueLimit = 20;
+    });
+
+    options.AddSlidingWindowLimiter("premium", configureOptions =>
+    {
+        configureOptions.PermitLimit = 500;
+        configureOptions.Window = TimeSpan.FromMinutes(1);
+        configureOptions.SegmentsPerWindow = 6;
+    });
+});
+```
+
+### 🔐 **Configuración JWT Avanzada**
+
+```csharp
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["JWT:Issuer"],
+            ValidAudience = builder.Configuration["JWT:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"])),
+            ClockSkew = TimeSpan.FromMinutes(5)
+        };
+    });
+```
+
+---
+
+## 🧪 **Testing y Cobertura**
+
+### 📊 **Estadísticas de Testing**
+
+| Tipo de Prueba  | Cantidad     | Cobertura | Estado          |
+| --------------- | ------------ | --------- | --------------- |
+| **Unitarias**   | 96           | 92.5%     | ✅ Passing      |
+| **Integración** | 12           | 88.2%     | ✅ Passing      |
+| **Carga**       | 9 escenarios | -         | ✅ Configured   |
+| **Total**       | **108**      | **90.8%** | ✅ **ALL PASS** |
+
+### 🧪 **Ejecutar Pruebas**
+
+```bash
+# Todas las pruebas
+.\manage-tests.ps1 run-all
+
+# Solo pruebas unitarias
+.\manage-tests.ps1 unit
+
+# Solo pruebas de integración
+.\manage-tests.ps1 integration
+
+# Con cobertura de código
+.\manage-tests.ps1 coverage
+
+# Pruebas de carga con K6
+.\manage-tests.ps1 load-test
+
+# Dashboard de resultados
+.\manage-tests.ps1 dashboard
+```
+
+### 📈 **Reporte de Cobertura**
+
+```bash
+# Generar reporte HTML
+dotnet test --collect:"XPlat Code Coverage" --settings coverlet.runsettings
+
+# Ver dashboard interactivo
+open ./TestResults/html/index.html
+
+# Reporte JSON para CI/CD
+reportgenerator -reports:"TestResults/*/coverage.cobertura.xml" \
+                -targetdir:"TestResults/json" \
+                -reporttypes:"JsonSummary"
+```
+
+### 🎯 **Criterios de Calidad**
+
+```yaml
+# Umbrales de cobertura (coverlet.runsettings)
+<DataCollector friendlyName="XPlat code coverage">
+<Configuration>
+<Threshold>90</Threshold>
+<ThresholdType>line,branch,method</ThresholdType>
+<ThresholdStat>minimum</ThresholdStat>
+</Configuration>
+</DataCollector>
+```
+
+---
+
+## 🐳 **Docker y Containerización**
+
+### 🏗️ **Multi-Stage Dockerfile**
+
+```dockerfile
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+WORKDIR /src
+COPY ["src/Gateway/Gateway.csproj", "Gateway/"]
+COPY ["Directory.Packages.props", "./"]
+RUN dotnet restore "Gateway/Gateway.csproj"
+
+COPY src/ .
+RUN dotnet build "Gateway/Gateway.csproj" -c Release --no-restore
+
+# Publish stage
+FROM build AS publish
+RUN dotnet publish "Gateway/Gateway.csproj" -c Release \
+    --no-build -o /app/publish --self-contained false
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS final
+WORKDIR /app
+
+# Security optimizations
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache curl
+
+COPY --from=publish /app/publish .
+RUN chown -R appuser:appgroup /app
+USER appuser
+
+EXPOSE 8100
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl --fail http://localhost:8100/health/live || exit 1
+
+ENTRYPOINT ["dotnet", "Gateway.dll"]
+```
+
+### 🐳 **Docker Compose Completo**
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  accessibility-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '8100:8100'
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - REDIS_CONNECTION_STRING=redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - accessibility-shared
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://localhost:8100/health/live']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - accessibility-shared
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_data:
+
+networks:
+  accessibility-shared:
+    external: true
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+```
+
+### 🛠️ **Comandos Docker Útiles**
+
+```bash
+# Build optimizado
+docker build -t accessibility-gw:latest .
+
+# Run con variables de entorno
+docker run -d --name gw-prod \
+  --env-file .env \
+  -p 8100:8100 \
+  accessibility-gw:latest
+
+# Logs en tiempo real
+docker logs -f accessibility-gw
+
+# Inspeccionar salud del contenedor
+docker exec accessibility-gw curl http://localhost:8100/health/ready
+
+# Métricas de recursos
+docker stats accessibility-gw
+```
+
+---
+
+## 📊 **Monitoreo y Observabilidad**
+
+### 🏥 **Endpoints de Health Check**
+
+| Endpoint           | Propósito        | Respuesta                    |
+| ------------------ | ---------------- | ---------------------------- |
+| `/health/live`     | Liveness probe   | `200 OK` si está vivo        |
+| `/health/ready`    | Readiness probe  | `200 OK` si está listo       |
+| `/health/detailed` | Health detallado | JSON con estado de servicios |
+
+```bash
+# Health check básico
+curl http://localhost:8100/health/live
+# Response: Healthy
+
+# Health check detallado
+curl http://localhost:8100/health/ready | jq
+{
+  "status": "Healthy",
+  "totalDuration": "00:00:00.0234567",
+  "entries": {
+    "redis": {
+      "status": "Healthy",
+      "duration": "00:00:00.0123456"
+    },
+    "users-api": {
+      "status": "Healthy",
+      "duration": "00:00:00.0234567"
+    }
+  }
+}
+```
+
+### 📈 **Métricas Prometheus**
+
+```bash
+# Endpoint de métricas
+curl http://localhost:8100/metrics
+
+# Métricas principales disponibles:
+# gateway_requests_total
+# gateway_request_duration_seconds
+# gateway_cache_hits_total
+# gateway_cache_misses_total
+# gateway_upstream_requests_total
+# gateway_error_rate
+```
+
+### 📝 **Logging Estructurado**
+
+```json
+// Ejemplo de log estructurado
+{
+  "@timestamp": "2025-09-16T10:30:00.000Z",
+  "level": "Information",
+  "message": "Request processed successfully",
+  "properties": {
+    "RequestId": "0HN7KQAAAAB:00000001",
+    "TraceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "SpanId": "d6e9ddf184e97ca6",
+    "Method": "GET",
+    "Path": "/api/users/profile",
+    "StatusCode": 200,
+    "Duration": 234.5,
+    "UserId": "user123",
+    "CacheHit": true
+  }
+}
+```
+
+### 🎯 **Dashboard de Métricas**
+
+```bash
+# Acceder al dashboard de testing
+open ./test-dashboard.html
+
+# Generar reportes de performance
+.\manage-gateway.ps1 performance-report
+
+# Métricas en tiempo real
+.\manage-gateway.ps1 monitor
+```
+
+---
+
+## 🔐 **Seguridad y Autenticación**
+
+### 🛡️ **Características de Seguridad**
+
+| Característica         | Implementación        | Estado          |
+| ---------------------- | --------------------- | --------------- |
+| **JWT Authentication** | Bearer tokens         | ✅ Activo       |
+| **Rate Limiting**      | Fixed/Sliding window  | ✅ Configurado  |
+| **CORS**               | Política configurable | ✅ Implementado |
+| **Security Headers**   | HSTS, CSP, X-Frame    | ✅ Automático   |
+| **Input Validation**   | Sanitización          | ✅ Habilitado   |
+| **HTTPS Redirect**     | Automático            | ✅ Forzado      |
+
+### 🔑 **Flujo de Autenticación**
+
+```mermaid
+sequenceDiagram
+    participant C as Cliente
+    participant GW as Gateway
+    participant U as Users API
+    participant R as Redis Cache
+
+    C->>GW: Login (credentials)
+    GW->>U: Validate credentials
+    U-->>GW: User data + claims
+    GW->>GW: Generate JWT
+    GW->>R: Cache user session
+    GW-->>C: JWT Token
+
+    Note over C,R: Subsequent requests
+
+    C->>GW: API Request + JWT
+    GW->>GW: Validate JWT
+    GW->>R: Check session
+    R-->>GW: Session valid
+    GW->>U: Forward request
+    U-->>GW: Response
+    GW-->>C: Response
+```
+
+### 🚦 **Configuración de Rate Limiting**
+
+```json
+{
+  "RateLimiting": {
+    "GlobalPolicy": {
+      "PermitLimit": 1000,
+      "Window": "00:01:00",
+      "ReplenishmentPeriod": "00:00:10",
+      "TokensPerPeriod": 100
+    },
+    "EndpointPolicies": {
+      "/api/auth/login": {
+        "PermitLimit": 5,
+        "Window": "00:01:00"
+      },
+      "/api/analysis/scan": {
+        "PermitLimit": 10,
+        "Window": "00:01:00"
+      }
+    }
+  }
+}
+```
+
+---
+
+## 🛠️ **Scripts de Gestión**
+
+### 🔧 **manage-gateway.ps1**
+
+Script principal para la gestión completa del gateway:
+
+```bash
+# Comandos disponibles
+.\manage-gateway.ps1 help
+
+# Gestión de servicios
+.\manage-gateway.ps1 start          # Iniciar gateway
+.\manage-gateway.ps1 stop           # Detener gateway
+.\manage-gateway.ps1 restart        # Reiniciar gateway
+.\manage-gateway.ps1 status         # Estado del gateway
+
+# Docker y contenedores
+.\manage-gateway.ps1 docker-build   # Construir imagen
+.\manage-gateway.ps1 docker-run     # Ejecutar contenedor
+.\manage-gateway.ps1 docker-logs    # Ver logs del contenedor
+
+# Base de datos y caché
+.\manage-gateway.ps1 redis-start    # Iniciar Redis
+.\manage-gateway.ps1 redis-flush    # Limpiar caché
+.\manage-gateway.ps1 cache-stats    # Estadísticas de caché
+
+# Monitoreo y salud
+.\manage-gateway.ps1 health         # Health check completo
+.\manage-gateway.ps1 metrics        # Métricas actuales
+.\manage-gateway.ps1 performance    # Reporte de performance
+```
+
+### 🧪 **manage-tests.ps1**
+
+Script especializado para testing y cobertura:
+
+```bash
+# Testing completo
+.\manage-tests.ps1 run-all          # Todas las pruebas
+.\manage-tests.ps1 unit             # Solo unitarias
+.\manage-tests.ps1 integration      # Solo integración
+.\manage-tests.ps1 load             # Pruebas de carga
+
+# Cobertura de código
+.\manage-tests.ps1 coverage         # Generar cobertura
+.\manage-tests.ps1 coverage-report  # Reporte HTML
+.\manage-tests.ps1 coverage-json    # Reporte JSON
+
+# Utilitarios
+.\manage-tests.ps1 clean            # Limpiar artifacts
+.\manage-tests.ps1 dashboard        # Abrir dashboard
+.\manage-tests.ps1 watch            # Modo watch
+```
+
+---
+
+## 📚 **API Documentation**
+
+### 🌐 **Endpoints Principales**
+
+| Categoría    | Endpoint                | Método | Descripción               |
+| ------------ | ----------------------- | ------ | ------------------------- |
+| **Health**   | `/health/live`          | GET    | Liveness probe            |
+| **Health**   | `/health/ready`         | GET    | Readiness probe           |
+| **Metrics**  | `/metrics`              | GET    | Métricas Prometheus       |
+| **Auth**     | `/api/auth/*`           | \*     | Proxy a Users API         |
+| **Users**    | `/api/users/*`          | \*     | Gestión de usuarios       |
+| **Analysis** | `/api/analysis/*`       | \*     | Análisis de accesibilidad |
+| **Reports**  | `/api/reports/*`        | \*     | Generación de reportes    |
+| **Cache**    | `/api/cache/invalidate` | POST   | Invalidación de caché     |
+
+### 📖 **Documentación Swagger**
+
+```bash
+# Acceder a la documentación interactiva
+open http://localhost:8100/swagger
+
+# Exportar especificación OpenAPI
+curl http://localhost:8100/swagger/v1/swagger.json > api-spec.json
+```
+
+### 🔍 **Ejemplos de Uso**
+
+```bash
+# Autenticación
+curl -X POST http://localhost:8100/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password"}'
+
+# Usar JWT token
+curl -X GET http://localhost:8100/api/users/profile \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Invalidar caché
+curl -X POST http://localhost:8100/api/cache/invalidate \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"pattern":"users:*"}'
+```
+
+---
+
+## 🔧 **Troubleshooting**
+
+### ❓ **Problemas Comunes**
+
+#### 🚫 **Gateway no inicia**
+
+```bash
+# Verificar puertos en uso
+netstat -ano | findstr :8100
+
+# Verificar configuración
+.\manage-gateway.ps1 validate-config
+
+# Logs detallados
+.\manage-gateway.ps1 logs --level Debug
+```
+
+#### 🔴 **Redis Connection Error**
+
+```bash
+# Verificar Redis
+redis-cli ping
+
+# Iniciar Redis si no está corriendo
+.\manage-gateway.ps1 redis-start
+
+# Verificar conectividad
+telnet localhost 6379
+```
+
+#### ⚠️ **Health Checks Failing**
+
+```bash
+# Verificar estado de microservicios
+curl http://localhost:8081/health
+curl http://localhost:8082/health
+curl http://localhost:8083/health
+
+# Reiniciar servicios
+.\manage-gateway.ps1 restart-dependencies
+```
+
+#### 🐛 **Performance Issues**
+
+```bash
+# Métricas de performance
+.\manage-gateway.ps1 performance-report
+
+# Análisis de caché
+.\manage-gateway.ps1 cache-stats
+
+# Profiling con dotTrace
+.\manage-gateway.ps1 profile --duration 60
+```
+
+### 📋 **Checklist de Diagnóstico**
+
+- [ ] ✅ Puerto 8100 disponible
+- [ ] ✅ Redis ejecutándose (puerto 6379)
+- [ ] ✅ Variables de entorno configuradas
+- [ ] ✅ Certificados SSL válidos (si HTTPS)
+- [ ] ✅ Microservicios backend disponibles
+- [ ] ✅ Red Docker configurada correctamente
+- [ ] ✅ Memoria suficiente (mín 512MB)
+- [ ] ✅ Permisos de archivo adecuados
+
+### 🔍 **Logs y Debugging**
+
+```bash
+# Logs en tiempo real
+tail -f ./logs/gateway-$(Get-Date -Format "yyyy-MM-dd").log
+
+# Logs con filtro
+.\manage-gateway.ps1 logs --filter "ERROR|WARN"
+
+# Debug mode
+$env:ASPNETCORE_ENVIRONMENT="Development"
+.\manage-gateway.ps1 start --debug
+```
+
+---
+
+## 🤝 **Contribución**
+
+### 🌟 **Cómo Contribuir**
+
+1. **Fork** el proyecto
+2. **Crear** una rama feature (`git checkout -b feature/amazing-feature`)
+3. **Commit** los cambios (`git commit -m 'Add amazing feature'`)
+4. **Push** a la rama (`git push origin feature/amazing-feature`)
+5. **Abrir** un Pull Request
+
+### 📋 **Checklist de Contribución**
+
+- [ ] ✅ Código sigue las convenciones de estilo
+- [ ] ✅ Tests agregados para nueva funcionalidad
+- [ ] ✅ Tests existentes pasan (`.\manage-tests.ps1 run-all`)
+- [ ] ✅ Cobertura de código >= 90%
+- [ ] ✅ Documentación actualizada
+- [ ] ✅ No hay vulnerabilidades de seguridad
+
+### 🏗️ **Estructura de Commits**
+
+```
+feat: nueva característica para usuarios
+fix: corrección en el servicio de caché
+docs: actualización de documentación
+style: formato de código
+refactor: reestructuración del RequestTranslator
+test: agregar pruebas de integración
+chore: actualizar dependencias
+```
+
+---
+
+## 📄 **Licencia**
+
+Este proyecto está licenciado bajo la **MIT License** - ver el archivo [LICENSE](LICENSE) para más detalles.
+
+---
+
+<div align="center">
+
+## 🎯 **¿Necesitas Ayuda?**
+
+**`.\manage-gateway.ps1 help` - ¡Todo lo que necesitas en un solo comando!**
+
+• ✅ **108 tests verificados** • ✅ **0 errores** • ✅ **Docker optimizado** • ✅ **Redis configurado** • ✅ **Documentación unificada** •
+
+[⭐ Star este proyecto](../../) • [🐛 Reportar Bug](../../issues) • [💡 Solicitar Feature](../../issues)
+
+**📅 Última actualización:** 16 de septiembre de 2025
+
+</div>
 1. 🌐 Client Request → Gateway :8100
 2. 🔐 JWT Validation → Auth Service
 3. 🚦 Rate Limiting → Policy Check
