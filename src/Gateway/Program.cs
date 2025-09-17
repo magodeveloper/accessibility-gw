@@ -403,17 +403,36 @@ app.Use(async (context, next) =>
         {
             Console.WriteLine("=== TRANSLATOR SERVICE OBTAINED ===");
 
-            // Intentar mapear la ruta a un servicio conocido
+            // Obtener configuración de rutas desde appsettings.json
+            var gateOptions = context.RequestServices.GetService<IOptions<GateOptions>>();
             string? targetService = null;
 
-            if (path.StartsWith("/api/v1/users") || path.StartsWith("/api/auth"))
-                targetService = "users";
-            else if (path.StartsWith("/api/Report"))
-                targetService = "reports";
-            else if (path.StartsWith("/api/Analysis"))
-                targetService = "analysis";
-            else if (path.StartsWith("/api/analyze"))
-                targetService = "middleware";
+            if (gateOptions?.Value?.AllowedRoutes != null)
+            {
+                // Buscar la ruta que coincida con el path y método actual
+                var matchedRoute = gateOptions.Value.AllowedRoutes.FirstOrDefault(route =>
+                    path.StartsWith(route.PathPrefix, StringComparison.OrdinalIgnoreCase) &&
+                    route.Methods.Any(m => string.Equals(m, method, StringComparison.OrdinalIgnoreCase)));
+
+                if (matchedRoute != null)
+                {
+                    targetService = matchedRoute.Service;
+                    Console.WriteLine($"=== ROUTE MATCHED === PathPrefix: {matchedRoute.PathPrefix}, Service: {matchedRoute.Service}");
+                }
+            }
+
+            // Fallback a mapeo hardcodeado si no se encuentra en configuración
+            if (targetService == null)
+            {
+                if (path.StartsWith("/api/v1/users") || path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase))
+                    targetService = "users";
+                else if (path.StartsWith("/api/Report"))
+                    targetService = "reports";
+                else if (path.StartsWith("/api/Analysis"))
+                    targetService = "analysis";
+                else if (path.StartsWith("/api/analyze"))
+                    targetService = "middleware";
+            }
 
             Console.WriteLine($"=== MAPPED TO SERVICE === {targetService ?? "null"}");
 
@@ -491,7 +510,7 @@ app.MapPost("/api/v1/translate", async (
         Console.WriteLine($"Body: {validatedReq.Body}");
         Console.WriteLine($"Body Length: {validatedReq.Body?.Length ?? 0}");
         Console.WriteLine($"Content-Length: {http.Request.ContentLength}");
-        
+
         // 1. Validación de tamaño de payload
         var max = opts.Value.MaxPayloadSizeBytes;
         if (http.Request.ContentLength is long len && len > max)
