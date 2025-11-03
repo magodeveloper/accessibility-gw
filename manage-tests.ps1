@@ -1,358 +1,557 @@
-# Script para generar el dashboard correcto
+#requires -version 5.0
+<#
+.SYNOPSIS
+    Script completo para gestión de tests del Gateway con dashboard dinámico y pruebas de carga K6
+.DESCRIPTION
+    Este script proporciona una interfaz completa para ejecutar tests, generar reportes de cobertura,
+    crear un dashboard dinámico y visualizar resultados de pruebas de carga K6.
+.PARAMETER Action
+    Acción a ejecutar: test, coverage, dashboard, full, clean, help
+.PARAMETER Filter
+    Filtro para tests específicos (opcional)
+.PARAMETER Configuration
+    Configuración de build: Debug o Release (default: Debug)
+.EXAMPLE
+    .\manage-tests.ps1 full
+    Ejecuta tests completos, genera cobertura y dashboard con métricas de K6
+.EXAMPLE
+    .\manage-tests.ps1 test -Filter "Gateway.UnitTests"
+    Ejecuta solo tests que contengan "Gateway.UnitTests"
+#>
+
 param(
-  [Parameter(Mandatory = $false)]
-  [switch]$RunTests = $false,
-  
-  [Parameter(Mandatory = $false)]
-  [switch]$OpenDashboard = $false,
-  
-  [Parameter(Mandatory = $false)]
-  [switch]$GenerateOnly = $false,
-  
-  [Parameter(Mandatory = $false)]
-  [switch]$RunLoadTests = $false,
-  
-  [Parameter(Mandatory = $false)]
-  [string]$OutputPath = "./test-dashboard.html"
+    [Parameter(Position = 0)]
+    [ValidateSet("test", "coverage", "dashboard", "full", "clean", "help", "")]
+    [string]$Action = "help",
+    
+    [Parameter()]
+    [string]$Filter = "",
+    
+    [Parameter()]
+    [ValidateSet("Debug", "Release")]
+    [string]$Configuration = "Debug",
+    
+    [Parameter()]
+    [switch]$DetailedOutput,
+    
+    [Parameter()]
+    [switch]$OpenDashboard
 )
 
-# Funciones auxiliares
-function Write-Header {
-  param([string]$Message)
-  Write-Host "📋 $Message" -ForegroundColor Magenta
+# Configuración global
+$ErrorActionPreference = "Stop"
+$ProjectName = "Gateway"
+$SolutionFile = "Gateway.sln"
+$TestProject = "src\tests\Gateway.UnitTests\Gateway.UnitTests.csproj"
+$OutputDir = "TestResults"
+$DashboardFile = "test-dashboard.html"
+$K6ResultsPath = "src\tests\Gateway.Load\results"
+
+# Colores para output
+$Colors = @{
+    Header    = "Cyan"
+    Success   = "Green" 
+    Warning   = "Yellow"
+    Error     = "Red"
+    Info      = "White"
+    Highlight = "Magenta"
 }
 
-function Write-Info {
-  param([string]$Message)
-  Write-Host "ℹ️  $Message" -ForegroundColor Cyan
+#region Funciones Auxiliares
+
+function Write-ColorMessage {
+    param(
+        [string]$Message,
+        [string]$Color = "White",
+        [string]$Prefix = ""
+    )
+    if ($Prefix) {
+        Write-Host "$Prefix " -ForegroundColor $Color -NoNewline
+        Write-Host $Message -ForegroundColor "White"
+    }
+    else {
+        Write-Host $Message -ForegroundColor $Color
+    }
 }
 
-function Write-Success {
-  param([string]$Message)  
-  Write-Host "✅ $Message" -ForegroundColor Green
+function Write-Banner {
+    param([string]$Title)
+    $border = "=" * 80
+    Write-Host ""
+    Write-ColorMessage $border $Colors.Header
+    Write-ColorMessage "  $Title" $Colors.Header
+    Write-ColorMessage $border $Colors.Header
+    Write-Host ""
 }
 
-function Write-Warning {
-  param([string]$Message)
-  Write-Host "⚠️  $Message" -ForegroundColor Yellow
+function Test-Prerequisites {
+    Write-ColorMessage "🔍 Verificando prerequisitos..." $Colors.Info
+    
+    # Verificar .NET
+    if (-not (Get-Command "dotnet" -ErrorAction SilentlyContinue)) {
+        throw "❌ .NET CLI no encontrado. Instale .NET 9 SDK."
+    }
+    
+    $dotnetVersion = dotnet --version
+    Write-ColorMessage "✅ .NET CLI encontrado: $dotnetVersion" $Colors.Success
+    
+    # Verificar archivos de proyecto
+    if (-not (Test-Path $SolutionFile)) {
+        throw "❌ Archivo de solución no encontrado: $SolutionFile"
+    }
+    
+    if (-not (Test-Path $TestProject)) {
+        throw "❌ Proyecto de tests no encontrado: $TestProject"
+    }
+    
+    Write-ColorMessage "✅ Archivos de proyecto verificados" $Colors.Success
 }
 
-function Write-Error {
-  param([string]$Message)
-  Write-Host "❌ $Message" -ForegroundColor Red
+function Initialize-Environment {
+    Write-ColorMessage "🏗️ Inicializando entorno..." $Colors.Info
+    
+    # Crear directorio de resultados
+    if (-not (Test-Path $OutputDir)) {
+        New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
+        Write-ColorMessage "📁 Directorio de resultados creado: $OutputDir" $Colors.Success
+    }
+    
+    # Limpiar resultados anteriores si se especifica
+    if ($Action -eq "clean" -or $Action -eq "full") {
+        Remove-Item "$OutputDir\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-ColorMessage "🧹 Resultados anteriores limpiados" $Colors.Success
+    }
 }
 
-# Función para obtener resultados reales de tests
-function Get-RealTestResults {
-  Write-Info "🧪 Ejecutando análisis de tests para obtener resultados reales (.NET)..."
-  
-  try {
-    # Verificar si es un proyecto .NET
-    if (-not (Test-Path "Gateway.sln") -and -not (Get-ChildItem -Recurse -Filter "*.csproj" -ErrorAction SilentlyContinue)) {
-      Write-Info "📦 No se encontró proyecto .NET"
-      return $null
+function Invoke-BuildSolution {
+    Write-ColorMessage "🔨 Compilando solución..." $Colors.Info
+    
+    $buildArgs = @(
+        "build"
+        $SolutionFile
+        "--configuration", $Configuration
+        "--verbosity", "minimal"
+        "--no-restore"
+    )
+    
+    if ($DetailedOutput) {
+        $buildArgs += "--verbosity", "detailed"
     }
     
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-      Write-Info "📦 dotnet CLI no está disponible"
-      return $null
+    dotnet restore $SolutionFile --verbosity minimal
+    dotnet @buildArgs | Out-Null
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-ColorMessage "❌ Error en la compilación" $Colors.Error
+        throw "Build failed with exit code $LASTEXITCODE"
     }
     
-    # Buscar los archivos TRX más recientes de la misma ejecución
-    $allTrxFiles = Get-ChildItem -Path "." -Filter "*.trx" -Recurse | 
-                   Sort-Object LastWriteTime -Descending
+    Write-ColorMessage "✅ Compilación exitosa" $Colors.Success
+}
+
+function Invoke-Tests {
+    param([bool]$CollectCoverage = $true)
     
-    if (-not $allTrxFiles) {
-      # Intentar buscar en TestResults
-      $allTrxFiles = Get-ChildItem -Path "TestResults" -Filter "*.trx" -Recurse -ErrorAction SilentlyContinue | 
-                     Sort-Object LastWriteTime -Descending
+    Write-ColorMessage "🧪 Ejecutando tests..." $Colors.Info
+    
+    $testArgs = @(
+        "test"
+        $TestProject
+        "--configuration", $Configuration
+        "--no-build"
+        "--verbosity", "normal"
+        "--logger", "trx;LogFileName=test-results.trx"
+        "--results-directory", $OutputDir
+    )
+    
+    if ($Filter) {
+        $testArgs += "--filter", $Filter
+        Write-ColorMessage "🔍 Filtro aplicado: $Filter" $Colors.Warning
     }
     
-    # Tomar solo los archivos de la ejecución más reciente (misma fecha/hora aproximada)
-    $trxFiles = @()
-    if ($allTrxFiles) {
-      $mostRecentTime = $allTrxFiles[0].LastWriteTime
-      $timeWindow = New-TimeSpan -Minutes 5  # Ventana de 5 minutos para considerar la misma ejecución
-      
-      $trxFiles = $allTrxFiles | Where-Object { 
-        ($mostRecentTime - $_.LastWriteTime) -lt $timeWindow 
-      }
+    if ($CollectCoverage) {
+        $testArgs += @(
+            "--collect", "XPlat Code Coverage"
+            "--settings", "coverlet.runsettings"
+        )
+        Write-ColorMessage "📊 Recolección de cobertura habilitada" $Colors.Info
     }
     
-    $realTestData = @{
-      TotalTests    = 0
-      PassingTests  = 0
-      FailingTests  = 0
-      TestSuites    = @{Count = 0}
-      ExecutionTime = [DateTime]::Now
-      Duration      = "0s"
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $testOutput = dotnet @testArgs 2>&1
+    $stopwatch.Stop()
+    
+    $exitCode = $LASTEXITCODE
+    $duration = $stopwatch.Elapsed.TotalSeconds
+    
+    # Parsear resultados de tests
+    $testResults = @{
+        ExitCode = $exitCode
+        Duration = $duration
+        Output   = $testOutput -join "`n"
+        Passed   = 0
+        Failed   = 0
+        Skipped  = 0
+        Total    = 0
     }
     
-    if ($trxFiles -and $trxFiles.Count -gt 0) {
-      try {
-        Write-Info "📄 Procesando $($trxFiles.Count) archivo(s) TRX de la ejecución más reciente:"
+    # Extraer estadísticas del output y del archivo TRX
+    $outputString = $testOutput -join "`n"
+    
+    # Intentar parsear desde el output directo
+    if ($outputString -match "Passed!\s+-\s+Failed:\s+(\d+),\s+Passed:\s+(\d+),\s+Skipped:\s+(\d+),\s+Total:\s+(\d+)") {
+        $testResults.Failed = [int]$matches[1]
+        $testResults.Passed = [int]$matches[2] 
+        $testResults.Skipped = [int]$matches[3]
+        $testResults.Total = [int]$matches[4]
+    }
+    elseif ($outputString -match "Failed!\s+-\s+Failed:\s+(\d+),\s+Passed:\s+(\d+),\s+Skipped:\s+(\d+),\s+Total:\s+(\d+)") {
+        $testResults.Failed = [int]$matches[1]
+        $testResults.Passed = [int]$matches[2]
+        $testResults.Skipped = [int]$matches[3]
+        $testResults.Total = [int]$matches[4]
+    }
+    else {
+        # Intentar parsear desde archivo TRX
+        $trxFile = Get-ChildItem -Path $OutputDir -Filter "test-results.trx" -Recurse | 
+        Sort-Object LastWriteTime -Descending | 
+        Select-Object -First 1
         
+        if ($trxFile) {
+            try {
+                [xml]$trxXml = Get-Content $trxFile.FullName
+                $counters = $trxXml.TestRun.ResultSummary.Counters
+                if ($counters) {
+                    $testResults.Total = [int]$counters.total
+                    $testResults.Passed = [int]$counters.passed
+                    $testResults.Failed = [int]$counters.failed
+                    $testResults.Skipped = [int]$counters.skipped
+                }
+            }
+            catch {
+                Write-ColorMessage "⚠️ No se pudo parsear archivo TRX: $($_.Exception.Message)" $Colors.Warning
+                # Valores por defecto si no se puede parsear
+                $testResults.Total = 1
+                $testResults.Passed = if ($exitCode -eq 0) { 1 } else { 0 }
+                $testResults.Failed = if ($exitCode -ne 0) { 1 } else { 0 }
+                $testResults.Skipped = 0
+            }
+        }
+    }
+    
+    # Mostrar resultados
+    if ($exitCode -eq 0) {
+        Write-ColorMessage "✅ Tests completados exitosamente" $Colors.Success
+        Write-ColorMessage "📈 Resultados: $($testResults.Passed) exitosos, $($testResults.Failed) fallidos, $($testResults.Skipped) omitidos" $Colors.Info
+    }
+    else {
+        Write-ColorMessage "❌ Tests fallaron" $Colors.Error
+        Write-ColorMessage "📉 Resultados: $($testResults.Passed) exitosos, $($testResults.Failed) fallidos, $($testResults.Skipped) omitidos" $Colors.Warning
+    }
+    
+    Write-ColorMessage "⏱️ Duración: $([math]::Round($duration, 2)) segundos" $Colors.Info
+    
+    # Usar Write-Output para asegurar que solo se devuelve el hashtable
+    Write-Output $testResults
+}
+
+function Get-CoverageData {
+    Write-ColorMessage "📊 Analizando cobertura..." $Colors.Info
+    
+    # Buscar archivo de cobertura más reciente
+    $coverageFiles = Get-ChildItem -Path $OutputDir -Filter "coverage.cobertura.xml" -Recurse | 
+    Sort-Object LastWriteTime -Descending
+    
+    if (-not $coverageFiles) {
+        Write-ColorMessage "⚠️ No se encontraron archivos de cobertura" $Colors.Warning
+        return $null
+    }
+    
+    $coverageFile = $coverageFiles[0]
+    Write-ColorMessage "📄 Archivo de cobertura: $($coverageFile.Name)" $Colors.Info
+    
+    try {
+        [xml]$xml = Get-Content $coverageFile.FullName
+        $coverage = $xml.coverage
+        
+        # Inicializar variables para cálculo ajustado
+        $adjustedTotalLines = 0
+        $adjustedCoveredLines = 0
+        $adjustedTotalBranches = 0
+        $adjustedCoveredBranches = 0
+        
+        $coverageData = @{
+            Timestamp       = $coverageFile.LastWriteTime
+            FilePath        = $coverageFile.FullName
+            TotalLines      = 0  # Se calculará después
+            CoveredLines    = 0  # Se calculará después
+            TotalBranches   = [int]$coverage.'branches-valid'
+            CoveredBranches = [int]$coverage.'branches-covered'
+            LineRate        = [math]::Round(([double]$coverage.'line-rate') * 100, 2)
+            BranchRate      = [math]::Round(([double]$coverage.'branch-rate') * 100, 2)
+            Assemblies      = @()
+        }
+        
+        # Procesar assemblies (excluyendo Infrastructure para líneas ajustadas)
+        foreach ($package in $xml.coverage.packages.package) {
+            if ($package.name -notlike "*Infrastructure*") {
+                # Calcular métricas sumando desde las clases del package
+                $packageLinesValid = 0
+                $packageLinesCovered = 0
+                $packageBranchesValid = 0
+                $packageBranchesCovered = 0
+                
+                foreach ($class in $package.classes.class) {
+                    foreach ($line in $class.lines.line) {
+                        $packageLinesValid++
+                        if ([int]$line.hits -gt 0) {
+                            $packageLinesCovered++
+                        }
+                    }
+                }
+                
+                $assemblyData = @{
+                    Name            = $package.name
+                    LineRate        = [math]::Round([double]$package.'line-rate' * 100, 2)
+                    BranchRate      = [math]::Round([double]$package.'branch-rate' * 100, 2)
+                    LinesValid      = $packageLinesValid
+                    LinesCovered    = $packageLinesCovered
+                    BranchesValid   = $packageBranchesValid
+                    BranchesCovered = $packageBranchesCovered
+                }
+                $coverageData.Assemblies += $assemblyData
+                
+                # Sumar líneas solo de proyectos evaluados
+                $adjustedTotalLines += $assemblyData.LinesValid
+                $adjustedCoveredLines += $assemblyData.LinesCovered
+                $adjustedTotalBranches += $assemblyData.BranchesValid
+                $adjustedCoveredBranches += $assemblyData.BranchesCovered
+            }
+        }
+        
+        # Actualizar valores ajustados (sin Infrastructure)
+        $coverageData.TotalLines = $adjustedTotalLines
+        $coverageData.CoveredLines = $adjustedCoveredLines
+        $coverageData.TotalBranches = $adjustedTotalBranches
+        $coverageData.CoveredBranches = $adjustedCoveredBranches
+        
+        # Recalcular porcentajes ajustados
+        if ($adjustedTotalLines -gt 0) {
+            $coverageData.LineRate = [math]::Round(($adjustedCoveredLines / $adjustedTotalLines) * 100, 2)
+        }
+        if ($adjustedTotalBranches -gt 0) {
+            $coverageData.BranchRate = [math]::Round(($adjustedCoveredBranches / $adjustedTotalBranches) * 100, 2)
+        }
+        
+        Write-ColorMessage "✅ Cobertura total: $($coverageData.LineRate)% líneas, $($coverageData.BranchRate)% ramas" $Colors.Success
+        
+        return $coverageData
+    }
+    catch {
+        Write-ColorMessage "❌ Error al procesar archivo de cobertura: $($_.Exception.Message)" $Colors.Error
+        return $null
+    }
+}
+
+#endregion
+
+#region Funciones específicas del Gateway - Pruebas de Carga K6
+
+function Get-K6LoadTestResults {
+    <#
+    .SYNOPSIS
+        Obtiene y procesa los resultados de las pruebas de carga K6
+    .DESCRIPTION
+        Lee los archivos JSON generados por K6 y extrae métricas de rendimiento
+    .NOTES
+        Esta función es específica del Gateway y procesa resultados de:
+        - light-load-k6 (20 usuarios)
+        - medium-load-k6 (50 usuarios)
+        - high-load (100 usuarios)
+        - extreme-load (500 usuarios)
+    #>
+    
+    Write-ColorMessage "⚡ Verificando tests de carga K6..." $Colors.Info
+    
+    if (-not (Test-Path $K6ResultsPath)) {
+        Write-ColorMessage "📁 No se encontró carpeta de resultados K6: $K6ResultsPath" $Colors.Warning
+        return @{ Available = $false }
+    }
+    
+    try {
+        $loadTestFiles = @{
+            "light-load-k6"  = "$K6ResultsPath\light-load-k6.json"
+            "medium-load-k6" = "$K6ResultsPath\medium-load-k6.json"
+            "high-load"      = "$K6ResultsPath\high-load.json"
+            "extreme-load"   = "$K6ResultsPath\extreme-load.json"
+        }
+        
+        $k6Results = @{}
+        $successfulTests = 0
         $totalTests = 0
-        $totalPassed = 0
-        $totalFailed = 0
-        $earliestStart = $null
-        $latestFinish = $null
         
-        foreach ($trxFile in $trxFiles) {
-          Write-Info "  - $($trxFile.Name)"
-          [xml]$trxXml = Get-Content $trxFile.FullName
-          $counters = $trxXml.TestRun.ResultSummary.Counters
-          
-          if ($counters) {
-            $totalTests += [int]$counters.total
-            $totalPassed += [int]$counters.passed
-            $totalFailed += [int]$counters.failed
+        foreach ($testName in $loadTestFiles.Keys) {
+            $filePath = $loadTestFiles[$testName]
+            $totalTests++
             
-            # Obtener tiempos para calcular duración total
-            $startTime = [DateTime]$trxXml.TestRun.Times.start
-            $finishTime = [DateTime]$trxXml.TestRun.Times.finish
-            
-            if (-not $earliestStart -or $startTime -lt $earliestStart) {
-              $earliestStart = $startTime
+            if (Test-Path $filePath) {
+                try {
+                    $content = Get-Content $filePath | ConvertFrom-Json
+                    $metrics = $content.metrics
+                    
+                    # Mapear usuarios según el test
+                    $userCount = switch ($testName) {
+                        "light-load-k6" { 20 }
+                        "medium-load-k6" { 50 }
+                        "high-load" { 100 }
+                        "extreme-load" { 500 }
+                    }
+                    
+                    # Calcular error rate
+                    $totalRequests = $metrics.http_reqs.count
+                    $failedRequests = if ($metrics.http_req_failed.count) { $metrics.http_req_failed.count } else { 0 }
+                    $errorRate = if ($totalRequests -gt 0) { [math]::Round(($failedRequests / $totalRequests) * 100, 2) } else { 0 }
+                    
+                    $k6Results[$testName] = @{
+                        Status     = if ($errorRate -lt 5) { "Success" } else { "Warning" }
+                        Users      = $userCount
+                        ExecutedAt = (Get-Item $filePath).LastWriteTime.ToString("HH:mm:ss")
+                        Metrics    = @{
+                            RequestsPerSecond = [math]::Round($metrics.http_reqs.rate, 1).ToString()
+                            ResponseTimeAvg   = [math]::Round($metrics.http_req_duration.avg, 1).ToString() + "ms"
+                            ResponseTimeP95   = [math]::Round($metrics.http_req_duration.'p(95)', 1).ToString() + "ms"
+                            ResponseTimeP99   = [math]::Round($metrics.http_req_duration.'p(99)', 1).ToString() + "ms"
+                            ErrorRate         = $errorRate.ToString() + "%"
+                            Iterations        = $metrics.iterations.count.ToString()
+                        }
+                    }
+                    
+                    if ($errorRate -lt 5) { $successfulTests++ }
+                    
+                    $reqPerSec = [math]::Round($metrics.http_reqs.rate, 1)
+                    $avgTime = [math]::Round($metrics.http_req_duration.avg, 1)
+                    Write-ColorMessage "  ✅ $testName`: $userCount usuarios, $reqPerSec req/s, ${avgTime}ms avg" $Colors.Success
+                }
+                catch {
+                    Write-ColorMessage "⚠️ Error al procesar $testName`: $($_.Exception.Message)" $Colors.Warning
+                    $k6Results[$testName] = @{
+                        Status  = "Failed"
+                        Users   = 0
+                        Metrics = @{ RequestsPerSecond = "Error" }
+                    }
+                }
             }
-            if (-not $latestFinish -or $finishTime -gt $latestFinish) {
-              $latestFinish = $finishTime
+            else {
+                Write-ColorMessage "  📄 Archivo no encontrado: $testName" $Colors.Info
+                $k6Results[$testName] = @{
+                    Status  = "Not Found"
+                    Users   = switch ($testName) {
+                        "light-load-k6" { 20 }
+                        "medium-load-k6" { 50 }
+                        "high-load" { 100 }
+                        "extreme-load" { 500 }
+                    }
+                    Metrics = @{ RequestsPerSecond = "N/A" }
+                }
             }
-          }
         }
         
-        $realTestData.TotalTests = $totalTests
-        $realTestData.PassingTests = $totalPassed
-        $realTestData.FailingTests = $totalFailed
-        
-        # Calcular duración total
-        if ($earliestStart -and $latestFinish) {
-          $duration = $latestFinish - $earliestStart
-          $realTestData.ExecutionTime = if ($duration.TotalSeconds -lt 60) {
-            "$([math]::Round($duration.TotalSeconds, 1))s"
-          } else {
-            "$([math]::Floor($duration.TotalMinutes))m $([math]::Round($duration.Seconds, 0))s"
-          }
-          $realTestData.Duration = $duration.ToString("hh\:mm\:ss")
+        return @{
+            ExecutionTime = [DateTime]::Now.AddMinutes(-1)
+            Summary       = @{
+                TotalExecuted = $totalTests
+                Successful    = $successfulTests
+                Failed        = $totalTests - $successfulTests
+            }
+            Available     = $true
+            K6            = $k6Results
+            Note          = "Datos reales de K6 del Gateway"
         }
-        
-        # Contar test suites (archivos de test)
-        $testFiles = Get-ChildItem -Path "src" -Recurse -Filter "*Test*.cs" -ErrorAction SilentlyContinue
-        if ($testFiles) {
-          $realTestData.TestSuites.Count = ($testFiles | Measure-Object).Count
-        } else {
-          $realTestData.TestSuites.Count = 1
-        }
-        
-        Write-Info "  Tests totales: $($realTestData.TotalTests)"
-        Write-Info "  Tests pasados: $($realTestData.PassingTests)"
-        Write-Info "  Tests fallidos: $($realTestData.FailingTests)"
-        Write-Info "  Test Suites: $($realTestData.TestSuites.Count)"
-        Write-Info "  Duración: $($realTestData.Duration)"
-        
-        return $realTestData
-      }
-      catch {
-        Write-Error "❌ Error al parsear archivos TRX: $($_.Exception.Message)"
-      }
-    } else {
-      Write-Info "📄 No se encontraron archivos TRX recientes"
     }
-    
-    return $null
-  }
-  catch {
-    Write-Error "Error obteniendo resultados de tests: $($_.Exception.Message)"
-    return $null
-  }
+    catch {
+        Write-ColorMessage "❌ Error al procesar resultados de K6: $($_.Exception.Message)" $Colors.Error
+        return @{ Available = $false }
+    }
 }
 
-# Función para obtener conteo real de test suites
-function Get-RealTestSuites {
-  Write-Info "📁 Contando archivos de test .NET..."
-  
-  try {
-    # Contar archivos de test .NET (archivos *Test*.cs)
-    $testFiles = Get-ChildItem -Path "src" -Recurse -Filter "*Test*.cs" -ErrorAction SilentlyContinue
-    
-    if (-not $testFiles) {
-      # Buscar también archivos Tests.cs
-      $testFiles = Get-ChildItem -Path "src" -Recurse -Filter "*Tests.cs" -ErrorAction SilentlyContinue
-    }
-    
-    $testCount = if ($testFiles) { ($testFiles | Measure-Object).Count } else { 0 }
-    
-    Write-Info "  Archivos de test .NET encontrados: $testCount"
-    
-    return @{Count = $testCount}
-  }
-  catch {
-    Write-Warning "Error contando archivos de test: $($_.Exception.Message)"
-    return @{Count = 0}
-  }
-}
+#endregion
 
-# Función para obtener métricas de tests de carga (placeholder por ahora)
-function Get-RealLoadTestResults {
-  Write-Info "⚡ Verificando tests de carga..."
-  
-  # Buscar archivos de resultados reales de K6 del gateway
-  $k6ResultsPath = "src\tests\Gateway.Load\results"
-  
-  if (-not (Test-Path $k6ResultsPath)) {
-    Write-Info "📁 No se encontró carpeta de resultados K6: $k6ResultsPath"
-    return @{ Available = $false }
-  }
-  
-  try {
-    $loadTestFiles = @{
-      "light-load-k6"  = "$k6ResultsPath\light-load-k6.json"
-      "medium-load-k6" = "$k6ResultsPath\medium-load-k6.json"
-      "high-load"      = "$k6ResultsPath\high-load.json"
-      "extreme-load"   = "$k6ResultsPath\extreme-load.json"
-    }
+#region Generación de Dashboard
+
+function New-DashboardHtml {
+    param(
+        $TestResults,
+        $CoverageData,
+        $LoadTestData
+    )
     
-    $k6Results = @{}
-    $successfulTests = 0
-    $totalTests = 0
+    Write-ColorMessage "🎨 Generando dashboard HTML..." $Colors.Info
     
-    foreach ($testName in $loadTestFiles.Keys) {
-      $filePath = $loadTestFiles[$testName]
-      $totalTests++
-      
-      if (Test-Path $filePath) {
-        try {
-          $content = Get-Content $filePath | ConvertFrom-Json
-          $metrics = $content.metrics
-          
-          # Mapear usuarios según el test
-          $userCount = switch ($testName) {
-            "light-load-k6" { 20 }
-            "medium-load-k6" { 50 }
-            "high-load" { 100 }
-            "extreme-load" { 500 }
-          }
-          
-          # Calcular error rate
-          $totalRequests = $metrics.http_reqs.count
-          $failedRequests = if ($metrics.http_req_failed.count) { $metrics.http_req_failed.count } else { 0 }
-          $errorRate = if ($totalRequests -gt 0) { [math]::Round(($failedRequests / $totalRequests) * 100, 2) } else { 0 }
-          
-          # Convertir datos recibidos/enviados a MB
-          $dataSentMB = [math]::Round($metrics.data_sent.count / 1MB, 2)
-          $dataReceivedMB = [math]::Round($metrics.data_received.count / 1MB, 2)
-          
-          # Calcular duración estimada basada en iteraciones y rate
-          # Duración = Total requests ÷ Rate de requests por segundo ÷ 60 (para minutos)
-          $totalRequests = $metrics.http_reqs.count
-          $requestRate = $metrics.http_reqs.rate
-          $estimatedDurationMinutes = if ($requestRate -gt 0) {
-            [math]::Round($totalRequests / $requestRate / 60, 1)
-          } else {
-            0.5  # Fallback si no hay rate
-          }
-          
-          $k6Results[$testName] = @{
-            Status     = if ($errorRate -lt 5) { "Success" } else { "Warning" }
-            Users      = $userCount
-            ExecutedAt = (Get-Item $filePath).LastWriteTime.ToString("HH:mm:ss")
-            Duration   = $estimatedDurationMinutes.ToString()
-            Metrics    = @{
-              RequestsPerSecond = [math]::Round($metrics.http_reqs.rate, 1).ToString()
-              ResponseTimeAvg   = [math]::Round($metrics.http_req_duration.avg, 1).ToString() + "ms"
-              ResponseTimeP95   = [math]::Round($metrics.http_req_duration.'p(95)', 1).ToString() + "ms"
-              ResponseTimeP99   = [math]::Round($metrics.http_req_duration.'p(99)', 1).ToString() + "ms"
-              ErrorRate         = $errorRate.ToString() + "%"
-              Iterations        = $metrics.iterations.count.ToString()
-              DataSent          = $dataSentMB.ToString() + " MB"
-              DataReceived      = $dataReceivedMB.ToString() + " MB"
+    # Asegurar que tenemos hashtables
+    Write-ColorMessage "🔍 Debug TestResults Type: $($TestResults.GetType().Name)" $Colors.Info
+    Write-ColorMessage "🔍 Debug TestResults Length: $($TestResults.Length)" $Colors.Info
+    
+    if ($TestResults -is [array]) {
+        Write-ColorMessage "🔍 Debug TestResults is Array, items: $($TestResults.Count)" $Colors.Info
+        for ($i = 0; $i -lt $TestResults.Count; $i++) {
+            Write-ColorMessage "🔍 Debug Item $i Type: $($TestResults[$i].GetType().Name)" $Colors.Info
+            if ($TestResults[$i] -is [hashtable]) {
+                Write-ColorMessage "🔍 Debug Found hashtable at index $i" $Colors.Info
+                $TestResults = $TestResults[$i]
+                break
             }
-          }
-          
-          if ($errorRate -lt 5) { $successfulTests++ }
-          
-          $reqPerSec = [math]::Round($metrics.http_reqs.rate, 1)
-          $avgTime = [math]::Round($metrics.http_req_duration.avg, 1)
-          Write-Info "  ✅ $testName`: $userCount usuarios, $reqPerSec req/s, ${avgTime}ms avg"
         }
-        catch {
-          Write-Warning "⚠️ Error al procesar $testName`: $($_.Exception.Message)"
-          $k6Results[$testName] = @{
-            Status = "Failed"
-            Users = 0
-            Metrics = @{ RequestsPerSecond = "Error" }
-          }
-        }
-      }
-      else {
-        Write-Info "  📄 Archivo no encontrado: $testName"
-        $k6Results[$testName] = @{
-          Status = "Not Found"
-          Users = switch ($testName) {
-            "light-load-k6" { 20 }
-            "medium-load-k6" { 50 }
-            "high-load" { 100 }
-            "extreme-load" { 500 }
-          }
-          Metrics = @{ RequestsPerSecond = "N/A" }
-        }
-      }
+    }
+    if ($CoverageData -is [array]) {
+        $CoverageData = $CoverageData[0]
     }
     
-    return @{
-      ExecutionTime = [DateTime]::Now.AddMinutes(-1)
-      Summary       = @{
-        TotalExecuted = $totalTests
-        Successful    = $successfulTests
-        Failed        = $totalTests - $successfulTests
-      }
-      Available     = $true
-      K6            = $k6Results
-      Note          = "Datos reales de K6 del Gateway"
-    }
-  }
-  catch {
-    Write-Error "❌ Error al procesar resultados de K6: $($_.Exception.Message)"
-    return @{ Available = $false }
-  }
-}
-
-function Get-DashboardHTML {
-  param(
-    [Parameter(Mandatory = $true)]
-    [hashtable]$TestData
-  )
-  
-  $timestamp = Get-Date -Format "dd 'de' MMMM yyyy, HH:mm"
-  $totalCoverage = [math]::Round((($TestData.Coverage.Statements + $TestData.Coverage.Branches + $TestData.Coverage.Functions + $TestData.Coverage.Lines) / 4), 1)
-  
-  # Calcular porcentajes para los estilos CSS
-  $passingPercentage = if ($TestData.TotalTests -gt 0) { [math]::Round(($TestData.PassingTests / $TestData.TotalTests) * 100, 1) } else { 0 }
-  $failingPercentage = if ($TestData.TotalTests -gt 0) { [math]::Round(($TestData.FailingTests / $TestData.TotalTests) * 100, 1) } else { 0 }
+    # Debug - verificar que tenemos los datos correctos
+    Write-ColorMessage "🔍 Debug Final TestResults.Total: $($TestResults.Total)" $Colors.Info
+    Write-ColorMessage "🔍 Debug Final TestResults.Passed: $($TestResults.Passed)" $Colors.Info
+    Write-ColorMessage "🔍 Debug Final TestResults.Duration: $($TestResults.Duration)" $Colors.Info
     
-  # Determinar clases CSS para el estado
-  $testStatusClass = if ($TestData.FailingTests -eq 0) { "" } else { "danger" }
-  $coverageClass = if ($totalCoverage -ge 80) { "" } elseif ($totalCoverage -ge 60) { "warning" } else { "danger" }
-  
-  # Expandir variables explícitamente para evitar problemas con here-strings
-  $totalTests = $TestData.TotalTests
-  $passingTests = $TestData.PassingTests
-  $failingTests = $TestData.FailingTests
-  $testSuitesCount = $TestData.TestSuites.Count
-  $testIcon = if ($TestData.FailingTests -eq 0) { "✅" } else { "⚠️" }
-  $coverageStatements = $TestData.Coverage.Statements
-  $coverageBranches = $TestData.Coverage.Branches
-  $coverageFunctions = $TestData.Coverage.Functions
-  $coverageLines = $TestData.Coverage.Lines
+    $timestamp = Get-Date -Format "dd 'de' MMMM yyyy, HH:mm"
+    
+    # Calcular métricas
+    $successRate = if ($TestResults.Total -gt 0) { 
+        [math]::Round(($TestResults.Passed / $TestResults.Total) * 100, 1) 
+    }
+    else { 0 }
+    
+    $statusBadge = if ($TestResults.Failed -eq 0) { 
+        "✅ $($TestResults.Total)/$($TestResults.Total) TESTS PASANDO"
+    }
+    else {
+        "⚠️ $($TestResults.Passed)/$($TestResults.Total) TESTS PASANDO - $($TestResults.Failed) FALLIDOS"
+    }
+    
+    # Generar filas de assemblies
+    $assemblyRows = ""
+    foreach ($assembly in $CoverageData.Assemblies) {
+        $assemblyClass = if ($assembly.LineRate -ge 90) { "coverage-excellent" }
+        elseif ($assembly.LineRate -ge 70) { "coverage-good" }
+        else { "coverage-poor" }
+        
+        $assemblyRows += @"
+                <div class="assembly-row">
+                    <div class="assembly-name">$($assembly.Name)</div>
+                    <div class="assembly-coverage">
+                        <div class="coverage-badge $assemblyClass">$($assembly.LineRate)%</div>
+                        <small>$($assembly.LinesCovered)/$($assembly.LinesValid) líneas</small>
+                    </div>
+                </div>
+"@
+    }
 
-  $html = @"
+    $html = @"
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚪 Accessibility Gateway - Test Dashboard</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚪</text></svg>">
+    <title>👥 $ProjectName - Test Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👥</text></svg>">
     <style>
         * {
             margin: 0;
@@ -404,7 +603,6 @@ function Get-DashboardHTML {
             font-size: 1.1em;
             background: linear-gradient(45deg, #2ecc71, #27ae60);
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
-            margin: 5px;
         }
 
         .status-badge.warning {
@@ -412,14 +610,9 @@ function Get-DashboardHTML {
             box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
         }
 
-        .status-badge.danger {
-            background: linear-gradient(45deg, #e74c3c, #c0392b);
-            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
-        }
-
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -480,14 +673,6 @@ function Get-DashboardHTML {
             justify-content: center;
         }
 
-        .progress-fill.warning {
-            background: linear-gradient(45deg, #f39c12, #e67e22);
-        }
-
-        .progress-fill.danger {
-            background: linear-gradient(45deg, #e74c3c, #c0392b);
-        }
-
         .progress-text {
             color: white;
             font-weight: bold;
@@ -496,7 +681,7 @@ function Get-DashboardHTML {
 
         .details-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -508,10 +693,6 @@ function Get-DashboardHTML {
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
-        .detail-card.full-width {
-            grid-column: span 2;
-        }
-
         .detail-card h3 {
             color: #2c3e50;
             margin-bottom: 20px;
@@ -520,260 +701,81 @@ function Get-DashboardHTML {
             padding-bottom: 8px;
         }
 
-        .load-results-summary {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border: 1px solid #dee2e6;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-
-        .load-results-header {
+        .assembly-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
+            padding: 12px 0;
+            border-bottom: 1px solid #ecf0f1;
         }
 
-        .load-results-header h4 {
-            color: #2c3e50;
-            margin: 0;
-            font-size: 1.4em;
+        .assembly-row:last-child {
+            border-bottom: none;
         }
 
-        .execution-time {
-            background: #3498db;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-
-        .load-results-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 15px;
-        }
-
-        .result-stat {
-            text-align: center;
-            padding: 15px;
-            border-radius: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .result-stat.success {
-            background: linear-gradient(135deg, #d5f4e6, #c8e6c9);
-            border: 2px solid #4caf50;
-        }
-
-        .result-stat.failed {
-            background: linear-gradient(135deg, #ffebee, #ffcdd2);
-            border: 2px solid #f44336;
-        }
-
-        .result-stat.total {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-            border: 2px solid #2196f3;
-        }
-
-        .stat-number {
-            font-size: 2.5em;
+        .assembly-name {
             font-weight: bold;
             color: #2c3e50;
         }
 
-        .stat-label {
-            font-size: 0.9em;
-            color: #6c757d;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        .assembly-coverage {
+            text-align: right;
         }
 
-        .tool-section {
-            margin-bottom: 30px;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        }
-
-        .k6-section {
-            border: 2px solid #1abc9c;
-        }
-
-        .tool-section-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 20px;
-            font-weight: bold;
-            color: white;
-        }
-
-        .k6-section .tool-section-header {
-            background: linear-gradient(135deg, #1abc9c, #16a085);
-        }
-
-        .tool-icon {
-            font-size: 1.8em;
-        }
-
-        .tool-section-header h4 {
-            margin: 0;
-            font-size: 1.3em;
-        }
-
-        .tool-badge {
-            padding: 5px 10px;
+        .coverage-badge {
+            display: inline-block;
+            padding: 5px 12px;
             border-radius: 15px;
             color: white;
-            font-size: 0.8em;
             font-weight: bold;
+            margin-bottom: 3px;
         }
 
-        .tool-k6 {
-            background: #1abc9c;
+        .coverage-excellent {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
         }
 
-        .tool-results-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            padding: 20px;
-            background: #f8f9fa;
-            max-width: 100%;
+        .coverage-good {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
         }
 
-        /* Responsive para 4 columnas */
-        @media (max-width: 1400px) {
-            .tool-results-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 18px;
-            }
+        .coverage-poor {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
         }
 
-        @media (max-width: 768px) {
-            .tool-results-grid {
-                grid-template-columns: 1fr;
-                gap: 16px;
-                padding: 15px;
-            }
+        .test-list {
+            margin-top: 10px;
         }
 
-        .load-result-card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid #dee2e6;
-            transition: all 0.3s ease;
-            min-width: 0; /* Permite que las cards se contraigan */
-            font-size: 0.9em; /* Texto ligeramente más pequeño para 4 columnas */
-        }
-
-        .load-result-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        }
-
-        .load-result-card.status-success {
-            border-left: 5px solid #4caf50;
-        }
-
-        .load-result-card.status-failed {
-            border-left: 5px solid #f44336;
-        }
-
-        .result-header {
+        .test-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f1f1;
         }
 
-        .result-title {
-            font-weight: bold;
-            color: #2c3e50;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.95em;
+        .test-item:last-child {
+            border-bottom: none;
         }
 
-        .users-count {
-            background: #3498db;
-            color: white;
-            padding: 3px 6px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: bold;
+        .test-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
         }
 
-        .result-status {
-            padding: 4px 8px;
-            border-radius: 16px;
-            font-size: 0.75em;
-            font-weight: bold;
+        .test-pass {
+            background: #2ecc71;
         }
 
-        .status-success .result-status {
-            background: #d5f4e6;
-            color: #2e7d32;
+        .test-fail {
+            background: #e74c3c;
         }
 
-        .status-failed .result-status {
-            background: #ffebee;
-            color: #c62828;
-        }
-
-        .result-metrics {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .metric-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border-left: 3px solid #3498db;
-        }
-
-        .metric-label {
-            font-weight: 600;
-            color: #495057;
-            font-size: 0.8em;
-        }
-
-        .metric-value {
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            color: #2c3e50;
-            background: #e3f2fd;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.75em;
-        }
-
-        .result-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 8px;
-            border-top: 1px solid #eee;
-            font-size: 0.75em;
-            color: #6c757d;
+        .test-warning {
+            background: #f39c12;
         }
 
         .timestamp {
@@ -803,16 +805,54 @@ function Get-DashboardHTML {
             box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
         }
 
+        /* Test Stats Flexbox */
+        .test-stats-flex {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        .stat-number-success {
+            color: #2ecc71;
+            font-size: 1.4em;
+        }
+
+        .stat-number-danger {
+            color: #e74c3c;
+            font-size: 1.4em;
+        }
+
+        .stat-number-warning {
+            color: #f39c12;
+            font-size: 1.4em;
+        }
+
+        /* List Styles */
+        .tech-list {
+            line-height: 1.8;
+        }
+
+        .arch-list {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+
+        /* Assembly Excluded */
+        .assembly-excluded {
+            background: #e8f5e8;
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .coverage-excluded {
+            background: #95a5a6;
+        }
+
         /* Responsive Design */
-        @media (max-width: 1024px) {
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        @media (max-width: 1024px) and (min-width: 769px) {
+            .stats-grid,
             .details-grid {
-                grid-template-columns: 1fr;
-            }
-            .detail-card.full-width {
-                grid-column: span 1;
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -820,12 +860,16 @@ function Get-DashboardHTML {
             .container-fluid {
                 padding: 15px;
             }
-            .stats-grid {
+
+            .stats-grid,
+            .details-grid {
                 grid-template-columns: 1fr;
             }
+
             .header h1 {
                 font-size: 2em;
             }
+
             .big-number {
                 font-size: 2.5em;
             }
@@ -837,179 +881,95 @@ function Get-DashboardHTML {
     <div class="container-fluid">
         <!-- Header -->
         <div class="header">
-            <h1>🚪 Accessibility Gateway</h1>
-            <p class="subtitle">Dashboard Comprehensivo de Tests - Middleware de Accesibilidad</p>
-            <div class="status-badge $testStatusClass">
-                $testIcon $passingTests/$totalTests TESTS EXITOSOS
-            </div>
-            <div class="status-badge $coverageClass">
-                📊 $totalCoverage% COBERTURA PROMEDIO
-            </div>
+            <h1>🛡️ $ProjectName</h1>
+            <p class="subtitle">Dashboard de Cobertura de Tests - Clean Architecture</p>
+            <div class="status-badge $(if ($TestResults.Failed -gt 0) { 'warning' })">$statusBadge</div>
             <div class="timestamp">Última actualización: $timestamp</div>
         </div>
 
         <!-- Main Stats -->
         <div class="stats-grid">
             <div class="stat-card">
-                <h3>📝 Total Tests</h3>
-                <div class="big-number">$totalTests</div>
+                <h3>📊 Cobertura Total</h3>
+                <div class="big-number $(if ($CoverageData.LineRate -lt 70) { 'warning' } elseif ($CoverageData.LineRate -lt 50) { 'danger' })">$($CoverageData.LineRate)%</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: 100%">
-                        <span class="progress-text">Suites: $testSuitesCount</span>
+                    <div class="progress-fill" data-width="$($CoverageData.LineRate)%">
+                        <div class="progress-text">$(if ($CoverageData.LineRate -ge 90) { 'Excelente' } elseif ($CoverageData.LineRate -ge 70) { 'Bueno' } else { 'Mejorable' })</div>
+                    </div>
+                </div>
+                <p><strong>$($CoverageData.CoveredLines) de $($CoverageData.TotalLines)</strong> líneas cubiertas</p>
+                <p><strong>$($CoverageData.CoveredBranches) de $($CoverageData.TotalBranches)</strong> ramas cubiertas ($($CoverageData.BranchRate)%)</p>
+            </div>
+
+            <div class="stat-card">
+                <h3>🧪 Tests Ejecutados</h3>
+                <div class="big-number">$($TestResults.Total)</div>
+                <div class="test-stats-flex">
+                    <div>
+                        <strong class="stat-number-success">$($TestResults.Passed)</strong><br>
+                        <small>✅ Exitosos</small>
+                    </div>
+                    <div>
+                        <strong class="$(if ($TestResults.Failed -gt 0) { 'stat-number-danger' } else { 'stat-number-success' })">$($TestResults.Failed)</strong><br>
+                        <small>❌ Fallidos</small>
+                    </div>
+                    <div>
+                        <strong class="$(if ($successRate -ge 95) { 'stat-number-success' } elseif ($successRate -ge 80) { 'stat-number-warning' } else { 'stat-number-danger' })">$successRate%</strong><br>
+                        <small>🎯 Tasa de éxito</small>
                     </div>
                 </div>
             </div>
 
             <div class="stat-card">
-                <h3>✅ Tests Exitosos</h3>
-                <div class="big-number">$passingTests</div>
+                <h3>⚡ Performance</h3>
+                <div class="big-number">$([math]::Round($TestResults.Duration, 1))s</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: $passingPercentage%">
-                        <span class="progress-text">$passingPercentage%</span>
+                    <div class="progress-fill" data-width="$(if ($TestResults.Duration -lt 10) { 90 } elseif ($TestResults.Duration -lt 30) { 70 } else { 50 })%">
+                        <div class="progress-text">$(if ($TestResults.Duration -lt 10) { 'Excelente' } elseif ($TestResults.Duration -lt 30) { 'Bueno' } else { 'Lento' })</div>
                     </div>
                 </div>
-            </div>
-
-            <div class="stat-card">
-                <h3>❌ Tests Fallidos</h3>
-                <div class="big-number $(if ($TestData.FailingTests -gt 0) { 'danger' } else { '' })">$($TestData.FailingTests)</div>
-                <div class="progress-bar">
-                    <div class="progress-fill $(if ($TestData.FailingTests -gt 0) { 'danger' } else { '' })" style="width: $failingPercentage%">
-                        <span class="progress-text">$failingPercentage%</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card">
-                <h3>📊 Cobertura Promedio</h3>
-                <div class="big-number $(if ($totalCoverage -ge 80) { '' } elseif ($totalCoverage -ge 60) { 'warning' } else { 'danger' })">$totalCoverage%</div>
-                <div class="progress-bar">
-                    <div class="progress-fill $(if ($totalCoverage -ge 80) { '' } elseif ($totalCoverage -ge 60) { 'warning' } else { 'danger' })" style="width: $totalCoverage%">
-                        <span class="progress-text">Objetivo: 80%</span>
-                    </div>
-                </div>
+                <p>Tiempo de ejecución para <strong>$($TestResults.Total)</strong> tests</p>
             </div>
         </div>
 
+        <!-- Assembly Details & Technical Details -->
         <div class="details-grid">
-            <div class="detail-card full-width">
-                <h3>K6 - Tests de Carga (20, 50, 100 y 500 usuarios)</h3>
-"@
-
-  # Mostrar resultados si están disponibles
-  if ($TestData.LoadTests.Results) {
-    $executionTime = $TestData.LoadTests.Results.ExecutionTime.ToString("dd/MM/yyyy HH:mm:ss")
-    $totalExecuted = $TestData.LoadTests.Results.Summary.TotalExecuted
-    $successful = $TestData.LoadTests.Results.Summary.Successful
-    $failed = $TestData.LoadTests.Results.Summary.Failed
-        
-    $html += @"
-                <div class="load-results-summary">
-                    <div class="load-results-header">
-                        <h4>📊 Resumen de Ejecución</h4>
-                        <span class="execution-time">Última ejecución: $executionTime</span>
-                    </div>
-                    <div class="load-results-stats">
-                        <div class="result-stat success">
-                            <span class="stat-number">$successful</span>
-                            <span class="stat-label">Exitosos</span>
-                        </div>
-                        <div class="result-stat failed">
-                            <span class="stat-number">$failed</span>
-                            <span class="stat-label">Fallidos</span>
-                        </div>
-                        <div class="result-stat total">
-                            <span class="stat-number">$totalExecuted</span>
-                            <span class="stat-label">Total</span>
-                        </div>
+            <div class="detail-card">
+                <h3>🏗️ Coverage por Assembly</h3>
+                $assemblyRows
+                <div class="assembly-row assembly-excluded">
+                    <div class="assembly-name">✅ Users.Infrastructure</div>
+                    <div class="assembly-coverage">
+                        <div class="coverage-badge coverage-excluded">0% (excluido)</div>
+                        <small>Omitido del cálculo</small>
                     </div>
                 </div>
+            </div>
+            
+            <div class="detail-card">
+                <h3>⚙️ Configuración Técnica</h3>
+                <ul class="tech-list">
+                    <li><strong>Framework:</strong> .NET 9</li>
+                    <li><strong>Test Framework:</strong> xUnit</li>
+                    <li><strong>Mocking:</strong> Moq</li>
+                    <li><strong>Assertions:</strong> FluentAssertions</li>
+                    <li><strong>Coverage Tool:</strong> Coverlet + ReportGenerator</li>
+                    <li><strong>Database:</strong> MySQL (Production) / InMemory (Tests)</li>
+                    <li><strong>Architecture:</strong> Clean Architecture</li>
+                </ul>
+            </div>
 
-                <!-- K6 Results Section -->
-                <div class="tool-section k6-section">
-                    <div class="tool-section-header">
-                        <span class="tool-icon">⚡</span>
-                        <h4>K6 - Tests de Carga (20, 50, 100 y 500 usuarios)</h4>
-                        <span class="tool-badge tool-k6">K6</span>
-                    </div>
-                    <div class="tool-results-grid">
-"@
-        
-    # Mostrar resultados de K6 en orden específico: 20, 50, 100, 500 usuarios
-    $orderedConfigs = @("light-load-k6", "medium-load-k6", "high-load", "extreme-load")
-    foreach ($config in $orderedConfigs) {
-      if ($TestData.LoadTests.Results.K6.ContainsKey($config)) {
-        $data = $TestData.LoadTests.Results.K6[$config]
-        $statusClass = if ($data.Status -eq "Success") { "status-success" } else { "status-failed" }
-        $statusIcon = if ($data.Status -eq "Success") { "✅" } else { "❌" }
-                
-        $html += @"
-                        <div class="load-result-card $statusClass">
-                            <div class="result-header">
-                                <div class="result-title">
-                                    $statusIcon $config
-                                    <span class="users-count">👥 $($data.Users) usuarios</span>
-                                </div>
-                                <div class="result-status">$($data.Status)</div>
-                            </div>
-"@
-                
-        if ($data.Status -eq "Success" -and $data.Metrics) {
-          $html += @"
-                            <div class="result-metrics">
-                                <div class="metric-row">
-                                    <span class="metric-label">🚀 Requests/seg:</span>
-                                    <span class="metric-value">$($data.Metrics.RequestsPerSecond)</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">⏱️ Resp. Promedio:</span>
-                                    <span class="metric-value">$($data.Metrics.ResponseTimeAvg)</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📊 P95:</span>
-                                    <span class="metric-value">$($data.Metrics.ResponseTimeP95)</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📈 P99:</span>
-                                    <span class="metric-value">$($data.Metrics.ResponseTimeP99)</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">❌ Tasa Error:</span>
-                                    <span class="metric-value">$($data.Metrics.ErrorRate)</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">🔄 Iteraciones:</span>
-                                    <span class="metric-value">$($data.Metrics.Iterations)</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📤 Datos Enviados:</span>
-                                    <span class="metric-value">$($data.Metrics.DataSent)</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📥 Datos Recibidos:</span>
-                                    <span class="metric-value">$($data.Metrics.DataReceived)</span>
-                                </div>
-                            </div>
-                            <div class="result-footer">
-                                <span class="execution-time">⏰ $($data.ExecutedAt)</span>
-                                <span class="duration">⏱️ $($data.Duration) min</span>
-                            </div>
-"@
-        }
-                
-        $html += @"
-                        </div>
-"@
-      }
-    }
-        
-    $html += @"
-                    </div>
-                </div>
-"@
-  }
-
-  $html += @"
+            <div class="detail-card">
+                <h3>📁 Arquitectura</h3>
+                <div class="big-number">.NET 9</div>
+                <p>Sistema construido con:</p>
+                <ul class="arch-list">
+                    <li>Entity Framework Core + MySQL</li>
+                    <li>xUnit + FluentAssertions</li>
+                    <li>Clean Architecture</li>
+                    <li>Dependency Injection</li>
+                    <li>JWT Authentication</li>
+                </ul>
             </div>
         </div>
     </div>
@@ -1017,246 +977,237 @@ function Get-DashboardHTML {
     <button class="refresh-btn" onclick="location.reload()">🔄 Actualizar</button>
 
     <script>
-        // Auto-refresh cada 5 minutos
-        setTimeout(function() {
-            location.reload();
-        }, 300000);
+        // Animación de carga para progress bars
+        document.addEventListener('DOMContentLoaded', function() {
+            const progressBars = document.querySelectorAll('.progress-fill');
+            progressBars.forEach(bar => {
+                const targetWidth = bar.getAttribute('data-width');
+                if (targetWidth) {
+                    bar.style.width = '0%';
+                    setTimeout(() => {
+                        bar.style.width = targetWidth;
+                    }, 500);
+                }
+            });
+        });
 
-        // Mostrar timestamp de carga
-        console.log('Dashboard cargado a las: $timestamp');
-        
-        // Información adicional en consola
-        console.log('📊 Estadísticas detalladas:');
-        console.log('- Tests totales: $($TestData.TotalTests)');
-        console.log('- Tests exitosos: $($TestData.PassingTests)');
-        console.log('- Tests fallidos: $($TestData.FailingTests)');
-        console.log('- Cobertura promedio: $totalCoverage%');
-        console.log('- Suites de tests: $($TestData.TestSuites.Count)');
-        console.log('- Tests de carga: $($TestData.LoadTests.Count)');
+        // Auto-refresh cada 30 segundos si la página está activa
+        let autoRefresh = setInterval(() => {
+            if (!document.hidden) {
+                location.reload();
+            }
+        }, 30000);
+
+        // Pausar auto-refresh cuando la página no está visible
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                clearInterval(autoRefresh);
+            } else {
+                autoRefresh = setInterval(() => location.reload(), 30000);
+            }
+        });
     </script>
 </body>
 </html>
 "@
 
-  return $html
+    $html | Out-File -FilePath $DashboardFile -Encoding UTF8 -Force
+    Write-ColorMessage "✅ Dashboard generado: $DashboardFile" $Colors.Success
+    
+    return $DashboardFile
 }
 
-# Función principal
-# Función para ejecutar tests reales con cobertura
-function Invoke-RealTests {
-  Write-Info "🧪 Ejecutando tests con cobertura..."
-  
-  try {
-    # Ejecutar tests con cobertura usando la configuración específica
-    $env:COLLECT_COVERAGE = "true"
-    $result = & npm run test:coverage 2>&1
-    
-    if ($LASTEXITCODE -eq 0) {
-      Write-Success "Tests ejecutados exitosamente"
-      return $true
-    } else {
-      Write-Warning "Tests completados con warnings"
-      Write-Info $result
-      return $true  # Continuar aunque haya warnings
-    }
-  }
-  catch {
-    Write-Error "Error ejecutando tests: $($_.Exception.Message)"
-    return $false
-  }
-}
+#endregion
 
-# Función para leer datos reales de cobertura de .NET
-function Get-JestCoverageData {
-  Write-Info "📊 Leyendo datos de cobertura..."
-  
-  # Buscar archivo de resumen de cobertura de ReportGenerator
-  $coverageSummaryPath = "coverage-report/Summary.json"
-  
-  if (-not (Test-Path $coverageSummaryPath)) {
-    Write-Warning "No se encontró archivo de cobertura en: $coverageSummaryPath"
-    Write-Info "Usando datos por defecto..."
-    return $null
-  }
-  
-  try {
-    $coverageData = Get-Content $coverageSummaryPath | ConvertFrom-Json
-    $summary = $coverageData.summary
-    
-    $realCoverageData = @{
-      Statements = [math]::Round($summary.linecoverage, 2)
-      Branches   = [math]::Round($summary.branchcoverage, 2)
-      Functions  = [math]::Round($summary.methodcoverage, 2)
-      Lines      = [math]::Round($summary.linecoverage, 2)
-    }
-    
-    Write-Success "Cobertura real obtenida:"
-    Write-Info "  Statements: $($realCoverageData.Statements)%"
-    Write-Info "  Branches: $($realCoverageData.Branches)%"
-    Write-Info "  Functions: $($realCoverageData.Functions)%"
-    Write-Info "  Lines: $($realCoverageData.Lines)%"
-    
-    return $realCoverageData
-  }
-  catch {
-    Write-Error "Error leyendo archivo de cobertura: $($_.Exception.Message)"
-    return $null
-  }
-}
+#region Funciones Principales
 
-function Main {
-  try {
-    Write-Header "=== ACCESSIBILITY GATEWAY TEST DASHBOARD GENERATOR ==="
+function Invoke-CleanAction {
+    Write-Banner "🧹 LIMPIEZA DE ARCHIVOS"
     
-    # Construir objeto de datos dinámicamente
-    Write-Info "📊 Obteniendo datos reales de tests..."
+    Initialize-Environment
     
-    # Inicializar objeto de datos
-    $TestData = @{
-      TotalTests      = 0
-      PassingTests    = 0
-      FailingTests    = 0
-      TestSuites      = @{Count = 0}
-      LoadTests       = @{Count = 0; Available = $false}
-      Coverage        = @{
-        Statements = 0
-        Branches   = 0
-        Functions  = 0
-        Lines      = 0
-      }
-      ExecutionTime   = [DateTime]::Now
-      Duration        = "0s"
-    }
-    
-    # Si se solicita ejecutar tests, hacerlo primero y obtener datos reales
-    if ($RunTests) {
-      Write-Info "Ejecutando tests para obtener datos actualizados..."
-      
-      # Obtener resultados reales de tests
-      $realTestResults = Get-RealTestResults
-      if ($realTestResults) {
-        $TestData.TotalTests = $realTestResults.TotalTests
-        $TestData.PassingTests = $realTestResults.PassingTests
-        $TestData.FailingTests = $realTestResults.FailingTests
-        $TestData.TestSuites = $realTestResults.TestSuites
-        $TestData.ExecutionTime = $realTestResults.ExecutionTime
-        $TestData.Duration = $realTestResults.Duration
-      }
-      
-      # Obtener datos reales de cobertura
-      $realCoverage = Get-JestCoverageData
-      if ($realCoverage) {
-        $TestData.Coverage = $realCoverage
-        Write-Success "✅ Datos de cobertura reales obtenidos"
-      }
-      
-      # Obtener información de tests de carga
-      $loadTestResults = Get-RealLoadTestResults
-      if ($loadTestResults) {
-        $TestData.LoadTests = @{
-          Count = if ($loadTestResults.Available) { $loadTestResults.Summary.TotalExecuted } else { 0 }
-          Available = $loadTestResults.Available
-          Results = $loadTestResults
+    # Limpiar directorios bin y obj
+    Get-ChildItem -Path "src" -Directory | ForEach-Object {
+        $binPath = Join-Path $_.FullName "bin"
+        $objPath = Join-Path $_.FullName "obj"
+        
+        if (Test-Path $binPath) {
+            Remove-Item $binPath -Recurse -Force
+            Write-ColorMessage "🗑️ Eliminado: $binPath" $Colors.Info
         }
-      }
-    }
-    else {
-      Write-Info "Usando datos básicos del proyecto (ejecutar con -RunTests para datos completos)"
-      
-      # Intentar obtener datos de tests existentes desde archivos TRX
-      $realTestResults = Get-RealTestResults
-      if ($realTestResults) {
-        $TestData.TotalTests = $realTestResults.TotalTests
-        $TestData.PassingTests = $realTestResults.PassingTests
-        $TestData.FailingTests = $realTestResults.FailingTests
-        $TestData.TestSuites = $realTestResults.TestSuites
-        $TestData.ExecutionTime = $realTestResults.ExecutionTime
-        $TestData.Duration = $realTestResults.Duration
-      }
-      else {
-        # Obtener conteo básico de archivos de test sin ejecutarlos
-        $testSuites = Get-RealTestSuites
-        $TestData.TestSuites = $testSuites
-      }
-      
-      # Intentar obtener datos de cobertura existentes si hay un archivo
-      $existingCoverage = Get-JestCoverageData
-      if ($existingCoverage) {
-        $TestData.Coverage = $existingCoverage
-        Write-Info "📊 Usando datos de cobertura existentes"
-      }
-      else {
-        Write-Warning "⚠️ No hay datos de cobertura disponibles. Ejecutar con -RunTests para generar cobertura actualizada."
-      }
-      
-      # Obtener información de tests de carga (también para datos básicos)
-      $loadTestResults = Get-RealLoadTestResults
-      if ($loadTestResults) {
-        $TestData.LoadTests = @{
-          Count = if ($loadTestResults.Available) { $loadTestResults.Summary.TotalExecuted } else { 0 }
-          Available = $loadTestResults.Available
-          Results = $loadTestResults
+        
+        if (Test-Path $objPath) {
+            Remove-Item $objPath -Recurse -Force  
+            Write-ColorMessage "🗑️ Eliminado: $objPath" $Colors.Info
         }
-      }
     }
     
-    Write-Info "Generando dashboard HTML..."
-    Write-Info "DEBUG: TestData.TotalTests = $($TestData.TotalTests)"
-    Write-Info "DEBUG: TestData.PassingTests = $($TestData.PassingTests)"
-    Write-Info "DEBUG: TestData.Coverage.Statements = $($TestData.Coverage.Statements)"
-    $dashboardHTML = Get-DashboardHTML -TestData $TestData
-        
-    # Escribir archivo
-    $dashboardHTML | Out-File -FilePath $OutputPath -Encoding UTF8
-    Write-Success "Dashboard generado: $OutputPath"
-        
-    # Mostrar estadísticas en consola con datos reales
-    Write-Info "=== RESUMEN DE TESTS ==="
-    Write-Info "Tests totales: $($TestData.TotalTests)"
-    Write-Success "Tests exitosos: $($TestData.PassingTests)"
-    if ($TestData.FailingTests -gt 0) {
-      Write-Warning "Tests fallidos: $($TestData.FailingTests)"
-    }
+    Write-ColorMessage "✅ Limpieza completada" $Colors.Success
+}
+
+function Invoke-TestAction {
+    Write-Banner "🧪 EJECUCIÓN DE TESTS"
     
-    $averageCoverage = [math]::Round(($TestData.Coverage.Statements + $TestData.Coverage.Branches + $TestData.Coverage.Functions + $TestData.Coverage.Lines) / 4, 1)
-    Write-Info "Cobertura promedio: $averageCoverage%"
-    Write-Info "  - Statements: $($TestData.Coverage.Statements)%"
-    Write-Info "  - Branches: $($TestData.Coverage.Branches)%"
-    Write-Info "  - Functions: $($TestData.Coverage.Functions)%"
-    Write-Info "  - Lines: $($TestData.Coverage.Lines)%"
+    Test-Prerequisites
+    Initialize-Environment
+    Invoke-BuildSolution
     
-    Write-Info "Suites de tests: $($TestData.TestSuites.Count)"
-    if ($TestData.LoadTests.Available) {
-      Write-Info "Tests de carga: $($TestData.LoadTests.Count)"
+    $testResults = Invoke-Tests -CollectCoverage $true
+    
+    if ($testResults.ExitCode -eq 0) {
+        Write-ColorMessage "🎉 Todos los tests completados exitosamente!" $Colors.Success
     }
     else {
-      Write-Info "Tests de carga: No configurados"
+        Write-ColorMessage "⚠️ Algunos tests fallaron. Revise los resultados." $Colors.Warning
     }
     
-    if ($TestData.Duration -ne "0s") {
-      Write-Info "Duración de ejecución: $($TestData.Duration)"
-    }
-        
-    # Abrir dashboard si se solicita
-    if ($OpenDashboard) {
-      Write-Info "Abriendo dashboard en el navegador..."
-      Start-Process $OutputPath
-    }
-        
-    Write-Success "✨ Dashboard de tests generado exitosamente"
-    if ($RunTests) {
-      Write-Info "📊 Dashboard con datos reales de la ejecución actual"
+    Write-Output $testResults
+}
+
+function Invoke-CoverageAction {
+    Write-Banner "📊 ANÁLISIS DE COBERTURA"
+    
+    $coverageData = Get-CoverageData
+    
+    if ($coverageData) {
+        Write-ColorMessage "📈 Reporte de cobertura generado exitosamente" $Colors.Success
+        return $coverageData
     }
     else {
-      Write-Info "💡 Para datos completos ejecutar: .\manage-tests.ps1 -RunTests -OpenDashboard"
+        Write-ColorMessage "❌ No se pudo generar el reporte de cobertura" $Colors.Error
+        return $null
     }
+}
+
+function Invoke-DashboardAction {
+    Write-Banner "🎨 GENERACIÓN DE DASHBOARD"
+    
+    $testResults = Invoke-TestAction
+    $coverageData = Invoke-CoverageAction
+    $loadTestData = Get-K6LoadTestResults
+    
+    if ($testResults -and $coverageData) {
+        $dashboardFile = New-DashboardHtml -TestResults $testResults -CoverageData $coverageData -LoadTestData $loadTestData
         
-  }
-  catch {
-    Write-Error "Error durante la generación del dashboard: $($_.Exception.Message)"
+        if ($OpenDashboard) {
+            Write-ColorMessage "🌐 Abriendo dashboard en el navegador..." $Colors.Info
+            Start-Process $dashboardFile
+        }
+        
+        Write-ColorMessage "🎯 Dashboard disponible en: $dashboardFile" $Colors.Highlight
+    }
+    else {
+        Write-ColorMessage "❌ No se pudo generar el dashboard" $Colors.Error
+    }
+}
+
+function Invoke-FullAction {
+    Write-Banner "🚀 EJECUCIÓN COMPLETA - TESTS + COBERTURA + DASHBOARD + K6"
+    
+    try {
+        Invoke-DashboardAction
+        Write-ColorMessage "🎉 Proceso completo finalizado exitosamente!" $Colors.Success
+    }
+    catch {
+        Write-ColorMessage "❌ Error durante la ejecución: $($_.Exception.Message)" $Colors.Error
+        throw
+    }
+}
+
+function Show-Help {
+    Write-Banner "📚 AYUDA - GESTOR DE TESTS GATEWAY"
+    
+    Write-Host @"
+USO:
+    .\manage-tests.ps1 [ACCIÓN] [PARÁMETROS]
+
+ACCIONES:
+    test        Ejecuta solo los tests unitarios
+    coverage    Ejecuta tests y genera reporte de cobertura  
+    dashboard   Ejecuta tests, cobertura y genera dashboard HTML con métricas K6
+    full        Ejecuta todo el proceso completo (recomendado)
+    clean       Limpia archivos de build y resultados anteriores
+    help        Muestra esta ayuda
+
+PARÁMETROS:
+    -Filter <filtro>        Filtra tests específicos (ej: "Gateway.UnitTests")
+    -Configuration <config> Configuración de build: Debug o Release (default: Debug)
+    -OpenDashboard          Abre automáticamente el dashboard en el navegador
+    -DetailedOutput         Muestra información detallada durante la ejecución
+
+EJEMPLOS:
+    .\manage-tests.ps1 full
+        Ejecuta el proceso completo con dashboard y métricas K6
+
+    .\manage-tests.ps1 test -Filter "Gateway.UnitTests" 
+        Ejecuta solo tests de Gateway.UnitTests
+
+    .\manage-tests.ps1 dashboard -OpenDashboard
+        Genera dashboard con K6 y lo abre en el navegador
+
+    .\manage-tests.ps1 coverage -Configuration Release
+        Ejecuta tests en modo Release con cobertura
+
+ARCHIVOS GENERADOS:
+    • TestResults/              - Resultados de tests y cobertura
+    • test-dashboard.html       - Dashboard interactivo con métricas K6
+    • *.trx                     - Resultados detallados de tests
+
+PRUEBAS DE CARGA K6:
+    El dashboard incluye métricas de los siguientes tests de carga:
+    • light-load-k6  (20 usuarios)   - Carga ligera
+    • medium-load-k6 (50 usuarios)   - Carga media
+    • high-load      (100 usuarios)  - Carga alta
+    • extreme-load   (500 usuarios)  - Carga extrema
+
+    Los resultados se leen desde: $K6ResultsPath
+
+"@ -ForegroundColor $Colors.Info
+
+    Write-ColorMessage "🎯 Para empezar rápidamente, ejecute: .\manage-tests.ps1 full" $Colors.Highlight
+    Write-ColorMessage "⚡ Para ejecutar pruebas de carga K6, use: .\src\tests\Gateway.Load\manage-load-tests.ps1" $Colors.Info
+}
+
+#endregion
+
+#region Ejecución Principal
+
+try {
+    switch ($Action.ToLower()) {
+        "test" { 
+            Invoke-TestAction | Out-Null
+        }
+        "coverage" { 
+            Invoke-CoverageAction | Out-Null
+        }
+        "dashboard" { 
+            Invoke-DashboardAction 
+        }
+        "full" { 
+            Invoke-FullAction 
+        }
+        "clean" { 
+            Invoke-CleanAction 
+        }
+        "help" { 
+            Show-Help 
+        }
+        "" { 
+            Show-Help 
+        }
+        default { 
+            Write-ColorMessage "❌ Acción no válida: $Action" $Colors.Error
+            Write-ColorMessage "💡 Ejecute '.\manage-tests.ps1 help' para ver las opciones disponibles" $Colors.Info
+            exit 1
+        }
+    }
+}
+catch {
+    Write-ColorMessage "💥 Error fatal: $($_.Exception.Message)" $Colors.Error
+    if ($DetailedOutput) {
+        Write-ColorMessage "📋 Stack trace: $($_.ScriptStackTrace)" $Colors.Error
+    }
     exit 1
-  }
 }
 
-# Ejecutar función principal
-Main
+#endregion

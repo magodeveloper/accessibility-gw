@@ -105,36 +105,61 @@
 #>
 
 param(
-    [Parameter(Mandatory=$false)]
-    [ValidateSet("smoke", "load", "stress", "spike", "endurance", "all", "install", "report", "clean", "clean-all", "test-verbose", "dashboard", "help")]
+    [Parameter(Mandatory = $false)]
+    [ValidateSet("smoke", "load", "stress", "spike", "endurance", "all", "install", "report", "clean", "clean-all", "test-verbose", "dashboard", "setup-full", "teardown", "run-all", "help")]
     [string]$Action = "smoke",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$BaseUrl = "http://localhost:5000",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$OutputDir = "results",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [int]$Users = 0,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$Duration = "",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$VerboseOutput,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$GenerateReport,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$SkipHealthCheck,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [int]$DaysOld = 7,
     
-    [Parameter(Mandatory=$false)]
-    [switch]$WhatIf
+    [Parameter(Mandatory = $false)]
+    [switch]$WhatIf,
+    
+    # Parámetros para setup-full
+    [Parameter(Mandatory = $false)]
+    [ValidateSet("docker", "local", "hybrid")]
+    [string]$Mode = "docker",
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$IncludeMonitoring,
+    
+    [Parameter(Mandatory = $false)]
+    [int]$WaitTime = 30,
+    
+    # Parámetros para teardown
+    [Parameter(Mandatory = $false)]
+    [switch]$RemoveVolumes,
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$RemoveImages,
+    
+    # Parámetros para run-all
+    [Parameter(Mandatory = $false)]
+    [switch]$IncludeExtreme,
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$SimpleOnly
 )
 
 # Configuración
@@ -145,11 +170,11 @@ $LogFile = Join-Path $ResultsDir "load-tests.log"
 
 # Colores para output
 $Colors = @{
-    Info = "Cyan"
+    Info    = "Cyan"
     Success = "Green"
     Warning = "Yellow"
-    Error = "Red"
-    Header = "Magenta"
+    Error   = "Red"
+    Header  = "Magenta"
 }
 
 function Write-ColoredOutput {
@@ -339,9 +364,9 @@ function Invoke-LoadTest {
             Write-Log "$TestType test completed successfully in $($duration.TotalSeconds) seconds"
             
             return @{
-                Success = $true
+                Success    = $true
                 ResultFile = $resultFile
-                Duration = $duration
+                Duration   = $duration
             }
         }
         else {
@@ -349,9 +374,9 @@ function Invoke-LoadTest {
             Write-Log "$TestType test failed with exit code: $LASTEXITCODE"
             
             return @{
-                Success = $false
+                Success    = $false
                 ResultFile = $null
-                Duration = $duration
+                Duration   = $duration
             }
         }
     }
@@ -360,10 +385,10 @@ function Invoke-LoadTest {
         Write-Log "Error running $TestType test: $($_.Exception.Message)"
         
         return @{
-            Success = $false
+            Success    = $false
             ResultFile = $null
-            Duration = $null
-            Error = $_.Exception.Message
+            Duration   = $null
+            Error      = $_.Exception.Message
         }
     }
 }
@@ -412,7 +437,8 @@ function Invoke-AllTests {
     
     if ($overallSuccess) {
         Write-ColoredOutput "`n🎉 All tests completed successfully!" "Success"
-    } else {
+    }
+    else {
         Write-ColoredOutput "`n⚠️  Some tests failed. Check the logs for details." "Warning"
     }
     
@@ -549,11 +575,13 @@ function Remove-AllTestResults {
             
             if ($WhatIf) {
                 $oldItems | ForEach-Object { Write-ColoredOutput "  Would delete: $($_.Name)" "Info" }
-            } else {
+            }
+            else {
                 $oldItems | Remove-Item -Recurse -Force
                 Write-ColoredOutput "✅ Cleaned main TestResults" "Success"
             }
-        } else {
+        }
+        else {
             Write-ColoredOutput "✅ No old files in main TestResults" "Success"
         }
     }
@@ -576,7 +604,8 @@ function Remove-AllTestResults {
                 
                 if ($WhatIf) {
                     $oldItems | ForEach-Object { Write-ColoredOutput "  Would delete: $($_.Name)" "Info" }
-                } else {
+                }
+                else {
                     $oldItems | Remove-Item -Recurse -Force
                     Write-ColoredOutput "✅ Cleaned $testProject" "Success"
                 }
@@ -587,25 +616,463 @@ function Remove-AllTestResults {
     Write-ColoredOutput "🎉 Test Results cleanup completed!" "Success"
 }
 
+# ========================================================================
+# NUEVAS FUNCIONES - FASE 4: CONSOLIDACIÓN
+# ========================================================================
+
+function Invoke-SetupFullEnvironment {
+    Write-ColoredOutput "`n╔════════════════════════════════════════════════════════════════╗" "Info"
+    Write-ColoredOutput "║    🚀 Accessibility Gateway - Full Environment Setup         ║" "Info"
+    Write-ColoredOutput "╚════════════════════════════════════════════════════════════════╝`n" "Info"
+    
+    Write-ColoredOutput "🔍 Verificando prerrequisitos..." "Info"
+    
+    # Verificar Docker si es necesario
+    if ($Mode -in @("docker", "hybrid")) {
+        if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+            Write-ColoredOutput "❌ Docker no está instalado" "Error"
+            return $false
+        }
+        
+        try {
+            docker ps | Out-Null
+            Write-ColoredOutput "  ✅ Docker está disponible y corriendo" "Success"
+        }
+        catch {
+            Write-ColoredOutput "❌ Docker no está corriendo. Por favor inicia Docker Desktop." "Error"
+            return $false
+        }
+    }
+    
+    # Verificar .NET si es necesario
+    if ($Mode -in @("local", "hybrid")) {
+        if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+            Write-ColoredOutput "❌ .NET SDK no está instalado" "Error"
+            return $false
+        }
+        Write-ColoredOutput "  ✅ .NET SDK disponible" "Success"
+    }
+    
+    Write-ColoredOutput "`n🚀 Levantando ambiente en modo: $Mode" "Info"
+    
+    $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ScriptDir))
+    
+    if ($Mode -eq "docker") {
+        Write-ColoredOutput "🐳 Levantando servicios con Docker Compose..." "Info"
+        Push-Location $projectRoot
+        
+        try {
+            if (Test-Path "docker-compose.dev.yml") {
+                docker-compose -f docker-compose.dev.yml --env-file .env.development up -d
+                Write-ColoredOutput "  ✅ Servicios Docker iniciados" "Success"
+            }
+            else {
+                Write-ColoredOutput "⚠️  docker-compose.dev.yml no encontrado" "Warning"
+            }
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    
+    # Esperar a que los servicios estén listos
+    Write-ColoredOutput "`n⏳ Esperando $WaitTime segundos para que los servicios inicien..." "Info"
+    Start-Sleep -Seconds $WaitTime
+    
+    # Verificar salud del Gateway
+    Write-ColoredOutput "`n🏥 Verificando salud de servicios..." "Info"
+    if (Test-ServiceHealth -Url $BaseUrl) {
+        Write-ColoredOutput "✅ Gateway está listo en $BaseUrl" "Success"
+    }
+    else {
+        Write-ColoredOutput "⚠️  Gateway no responde aún. Puede necesitar más tiempo." "Warning"
+    }
+    
+    # Levantar monitoreo si se solicita
+    if ($IncludeMonitoring) {
+        Write-ColoredOutput "`n📊 Levantando stack de monitoreo (Prometheus + Grafana)..." "Info"
+        Push-Location $projectRoot
+        
+        try {
+            if (Test-Path "docker-compose.monitoring.yml") {
+                docker-compose -f docker-compose.monitoring.yml up -d
+                Write-ColoredOutput "  ✅ Prometheus: http://localhost:9090" "Success"
+                Write-ColoredOutput "  ✅ Grafana: http://localhost:3000 (admin/admin)" "Success"
+            }
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    
+    Write-ColoredOutput "`n🎉 Ambiente levantado exitosamente!" "Success"
+    Write-ColoredOutput "`n📋 Próximos pasos:" "Info"
+    Write-ColoredOutput "  1. Verificar servicios: docker ps" "Info"
+    Write-ColoredOutput "  2. Ejecutar tests: .\manage-load-tests.ps1 -Action smoke" "Info"
+    Write-ColoredOutput "  3. Detener ambiente: .\manage-load-tests.ps1 -Action teardown`n" "Info"
+    
+    return $true
+}
+
+function Invoke-TeardownEnvironment {
+    Write-ColoredOutput "`n╔════════════════════════════════════════════════════════════════╗" "Info"
+    Write-ColoredOutput "║    🛑 Detener Ambiente de Pruebas de Carga                    ║" "Info"
+    Write-ColoredOutput "╚════════════════════════════════════════════════════════════════╝`n" "Info"
+    
+    $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ScriptDir))
+    
+    # Detener contenedores Docker
+    Write-ColoredOutput "🐳 Deteniendo contenedores Docker..." "Info"
+    Push-Location $projectRoot
+    
+    try {
+        $composeFiles = @("docker-compose.dev.yml", "docker-compose.monitoring.yml")
+        
+        foreach ($composeFile in $composeFiles) {
+            if (Test-Path $composeFile) {
+                if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
+                    docker-compose -f $composeFile down 2>&1 | Out-Null
+                }
+                else {
+                    docker compose -f $composeFile down 2>&1 | Out-Null
+                }
+            }
+        }
+        
+        Write-ColoredOutput "  ✅ Contenedores Docker detenidos" "Success"
+    }
+    finally {
+        Pop-Location
+    }
+    
+    # Limpiar contenedores huérfanos
+    $containers = docker ps -a --filter "name=accessibility-" --format "{{.Names}}" 2>$null
+    if ($containers) {
+        Write-ColoredOutput "  Limpiando contenedores huérfanos..." "Info"
+        $containers | ForEach-Object {
+            docker stop $_ 2>&1 | Out-Null
+            docker rm $_ 2>&1 | Out-Null
+        }
+    }
+    
+    # Detener procesos locales en puertos conocidos
+    Write-ColoredOutput "💻 Deteniendo procesos locales..." "Info"
+    $ports = @(5000, 8100, 8081, 8082, 8083, 3001, 9090, 3000)
+    
+    foreach ($port in $ports) {
+        $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+        if ($connections) {
+            $processes = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+            foreach ($processId in $processes) {
+                try {
+                    $proc = Get-Process -Id $processId -ErrorAction Stop
+                    Write-ColoredOutput "  Deteniendo proceso $($proc.Name) en puerto $port" "Info"
+                    Stop-Process -Id $processId -Force
+                }
+                catch {
+                    # Proceso ya no existe
+                }
+            }
+        }
+    }
+    
+    # Limpiar volúmenes si se solicita
+    if ($CleanVolumes) {
+        Write-ColoredOutput "🗑️  Limpiando volúmenes Docker..." "Warning"
+        docker volume prune -f 2>&1 | Out-Null
+        Write-ColoredOutput "  ✅ Volúmenes limpiados" "Success"
+    }
+    
+    # Limpieza completa si se solicita
+    if ($CleanAll) {
+        Write-ColoredOutput "🗑️  Limpieza completa (imágenes y networks)..." "Warning"
+        docker system prune -af 2>&1 | Out-Null
+        Write-ColoredOutput "  ✅ Limpieza completa realizada" "Success"
+    }
+    
+    Write-ColoredOutput "`n✅ Ambiente detenido y limpiado" "Success"
+}
+
+# ========================================================================
+# NUEVAS FUNCIONES - FASE 4: CONSOLIDACIÓN
+# ========================================================================
+
+function Initialize-FullEnvironment {
+    param(
+        [string]$Mode = "docker",
+        [switch]$IncludeMonitoring,
+        [int]$WaitTime = 30
+    )
+    
+    Write-ColoredOutput "`n🚀 Setting up full environment..." "Header"
+    Write-ColoredOutput "Mode: $Mode" "Info"
+    Write-ColoredOutput "Include Monitoring: $IncludeMonitoring" "Info"
+    
+    try {
+        # Navegar al directorio raíz del proyecto Gateway
+        $gatewayRoot = Split-Path -Parent $PSScriptRoot
+        Push-Location $gatewayRoot
+        
+        Write-ColoredOutput "`n📦 Starting Docker containers..." "Info"
+        
+        # Verificar que Docker está disponible
+        if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+            Write-ColoredOutput "❌ Docker is not installed or not in PATH" "Error"
+            return $false
+        }
+        
+        # Ejecutar docker-compose según el modo
+        switch ($Mode) {
+            "docker" {
+                Write-ColoredOutput "Starting Gateway and all microservices with Docker..." "Info"
+                docker-compose up -d
+            }
+            "local" {
+                Write-ColoredOutput "Starting only dependencies (databases, etc.) with Docker..." "Info"
+                docker-compose up -d postgres redis
+                Write-ColoredOutput "⚠️  Remember to start Gateway and microservices manually" "Warning"
+            }
+            "hybrid" {
+                Write-ColoredOutput "Starting microservices with Docker..." "Info"
+                docker-compose up -d postgres redis
+                docker-compose up -d ms-users ms-analysis ms-reports
+            }
+        }
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColoredOutput "❌ Failed to start Docker containers" "Error"
+            return $false
+        }
+        
+        # Incluir monitoring si se solicitó
+        if ($IncludeMonitoring) {
+            Write-ColoredOutput "`n📊 Starting monitoring stack..." "Info"
+            if (Test-Path "docker-compose.monitoring.yml") {
+                docker-compose -f docker-compose.monitoring.yml up -d
+            }
+            else {
+                Write-ColoredOutput "⚠️  Monitoring compose file not found" "Warning"
+            }
+        }
+        
+        # Esperar a que los servicios estén listos
+        Write-ColoredOutput "`n⏱️  Waiting $WaitTime seconds for services to be ready..." "Info"
+        Start-Sleep -Seconds $WaitTime
+        
+        # Verificar salud del Gateway
+        Write-ColoredOutput "`n🏥 Checking Gateway health..." "Info"
+        $maxRetries = 5
+        $retryCount = 0
+        $isHealthy = $false
+        
+        while ($retryCount -lt $maxRetries -and -not $isHealthy) {
+            try {
+                $response = Invoke-WebRequest -Uri "$BaseUrl/health" -TimeoutSec 5 -ErrorAction SilentlyContinue
+                if ($response.StatusCode -eq 200) {
+                    $isHealthy = $true
+                    Write-ColoredOutput "✅ Gateway is healthy and ready!" "Success"
+                }
+            }
+            catch {
+                $retryCount++
+                if ($retryCount -lt $maxRetries) {
+                    Write-ColoredOutput "⏳ Retry $retryCount/$maxRetries..." "Warning"
+                    Start-Sleep -Seconds 5
+                }
+            }
+        }
+        
+        if (-not $isHealthy) {
+            Write-ColoredOutput "⚠️  Gateway health check failed, but containers are running" "Warning"
+            Write-ColoredOutput "Check logs with: docker-compose logs gateway" "Info"
+        }
+        
+        # Mostrar estado de contenedores
+        Write-ColoredOutput "`n📋 Container status:" "Info"
+        docker-compose ps
+        
+        Write-ColoredOutput "`n✅ Environment setup completed!" "Success"
+        return $true
+    }
+    catch {
+        Write-ColoredOutput "❌ Error setting up environment: $_" "Error"
+        return $false
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Invoke-Teardown {
+    param(
+        [switch]$RemoveVolumes,
+        [switch]$RemoveImages
+    )
+    
+    Write-ColoredOutput "`n🛑 Tearing down environment..." "Header"
+    
+    try {
+        # Navegar al directorio raíz del proyecto Gateway
+        $gatewayRoot = Split-Path -Parent $PSScriptRoot
+        Push-Location $gatewayRoot
+        
+        Write-ColoredOutput "`n📦 Stopping Docker containers..." "Info"
+        docker-compose down
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-ColoredOutput "⚠️  Some containers may have already been stopped" "Warning"
+        }
+        
+        # Detener monitoring si existe
+        if (Test-Path "docker-compose.monitoring.yml") {
+            Write-ColoredOutput "📊 Stopping monitoring stack..." "Info"
+            docker-compose -f docker-compose.monitoring.yml down
+        }
+        
+        # Eliminar volúmenes si se solicitó
+        if ($RemoveVolumes) {
+            Write-ColoredOutput "`n🗑️  Removing volumes..." "Warning"
+            docker-compose down -v
+        }
+        
+        # Eliminar imágenes si se solicitó
+        if ($RemoveImages) {
+            Write-ColoredOutput "`n🗑️  Removing images..." "Warning"
+            docker-compose down --rmi local
+        }
+        
+        # Limpiar resultados de tests
+        Write-ColoredOutput "`n🧹 Cleaning test results..." "Info"
+        if (Test-Path $OutputDir) {
+            $oldResults = Get-ChildItem -Path $OutputDir -Filter "*.json" | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-1) }
+            if ($oldResults.Count -gt 0) {
+                $oldResults | Remove-Item -Force
+                Write-ColoredOutput "Cleaned $($oldResults.Count) old test results" "Success"
+            }
+        }
+        
+        Write-ColoredOutput "`n✅ Teardown completed!" "Success"
+        return $true
+    }
+    catch {
+        Write-ColoredOutput "❌ Error during teardown: $_" "Error"
+        return $false
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Invoke-RunAllTests {
+    param(
+        [switch]$IncludeExtreme,
+        [switch]$SimpleOnly
+    )
+    
+    Write-ColoredOutput "`n🚀 Running all tests with generic scenario..." "Header"
+    
+    $testConfigs = @(
+        @{Users = 20; Level = "light"; Type = "full" }
+        @{Users = 50; Level = "medium"; Type = "full" }
+        @{Users = 100; Level = "high"; Type = "full" }
+    )
+    
+    if ($SimpleOnly) {
+        $testConfigs = @(
+            @{Users = 20; Level = "light"; Type = "simple" }
+            @{Users = 50; Level = "medium"; Type = "simple" }
+            @{Users = 100; Level = "high"; Type = "simple" }
+        )
+    }
+    
+    if ($IncludeExtreme) {
+        $testConfigs += @{Users = 500; Level = "extreme"; Type = $testConfigs[0].Type }
+    }
+    
+    $successCount = 0
+    $totalCount = $testConfigs.Count
+    
+    foreach ($config in $testConfigs) {
+        $testName = "concurrent-$($config.Users)-$($config.Type)"
+        Write-ColoredOutput "`n📊 Running test: $testName" "Info"
+        Write-ColoredOutput "Users: $($config.Users), Level: $($config.Level), Type: $($config.Type)" "Info"
+        
+        $envVars = @(
+            "USERS=$($config.Users)"
+            "TEST_LEVEL=$($config.Level)"
+            "SCENARIO_TYPE=$($config.Type)"
+        )
+        
+        if ($VerboseOutput) {
+            $envVars += "VERBOSE=true"
+        }
+        
+        $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $outputFile = Join-Path $OutputDir "$testName-$timestamp.json"
+        
+        $k6Args = @(
+            "run"
+            "--out", "json=$outputFile"
+        )
+        
+        foreach ($env in $envVars) {
+            $k6Args += "--env"
+            $k6Args += $env
+        }
+        
+        $k6Args += "scenarios/concurrent-users-generic.js"
+        
+        try {
+            & k6 $k6Args
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-ColoredOutput "✅ Test $testName completed successfully" "Success"
+                $successCount++
+            }
+            else {
+                Write-ColoredOutput "❌ Test $testName failed with exit code $LASTEXITCODE" "Error"
+            }
+        }
+        catch {
+            Write-ColoredOutput "❌ Error running test $testName : $_" "Error"
+        }
+        
+        # Pausa entre tests
+        if ($config -ne $testConfigs[-1]) {
+            Write-ColoredOutput "`n⏸️  Pausing 10 seconds before next test..." "Info"
+            Start-Sleep -Seconds 10
+        }
+    }
+    
+    Write-ColoredOutput "`n════════════════════════════════════════" "Header"
+    Write-ColoredOutput "📊 SUMMARY: $successCount/$totalCount tests passed" "Info"
+    Write-ColoredOutput "════════════════════════════════════════" "Header"
+    
+    return ($successCount -eq $totalCount)
+}
+
 function Show-Help {
     Write-ColoredOutput "`n🚀 ACCESSIBILITY GATEWAY LOAD TESTS - UNIFIED SCRIPT" "Header"
     Write-ColoredOutput "=========================================================" "Header"
     Write-ColoredOutput "`n📋 Available Actions:" "Info"
     
     $actions = @(
-        @{Name="smoke"; Description="Basic functionality test (quick)"}
-        @{Name="load"; Description="Normal load test"}
-        @{Name="stress"; Description="Stress test with high load"}
-        @{Name="spike"; Description="Spike test with sudden load bursts"}
-        @{Name="endurance"; Description="Long-running endurance test (~40 min)"}
-        @{Name="all"; Description="Run all load tests sequentially"}
-        @{Name="install"; Description="Install k6 load testing tool"}
-        @{Name="report"; Description="Generate consolidated test report"}
-        @{Name="clean"; Description="Clean old load test results"}
-        @{Name="clean-all"; Description="Clean all TestResults in project"}
-        @{Name="test-verbose"; Description="Run verbose test script (replaces test-script.ps1)"}
-        @{Name="dashboard"; Description="Generate HTML dashboard with test results"}
-        @{Name="help"; Description="Show this help information"}
+        @{Name = "smoke"; Description = "Basic functionality test (quick)" }
+        @{Name = "load"; Description = "Normal load test" }
+        @{Name = "stress"; Description = "Stress test with high load" }
+        @{Name = "spike"; Description = "Spike test with sudden load bursts" }
+        @{Name = "endurance"; Description = "Long-running endurance test (~40 min)" }
+        @{Name = "all"; Description = "Run all load tests sequentially" }
+        @{Name = "install"; Description = "Install k6 load testing tool" }
+        @{Name = "report"; Description = "Generate consolidated test report" }
+        @{Name = "clean"; Description = "Clean old load test results" }
+        @{Name = "clean-all"; Description = "Clean all TestResults in project" }
+        @{Name = "test-verbose"; Description = "Run verbose test script (replaces test-script.ps1)" }
+        @{Name = "dashboard"; Description = "Generate HTML dashboard with test results" }
+        @{Name = "setup-full"; Description = "✨ Setup full environment (Gateway + microservices)" }
+        @{Name = "teardown"; Description = "✨ Teardown environment and cleanup" }
+        @{Name = "run-all"; Description = "✨ Run all tests using generic scenario" }
+        @{Name = "help"; Description = "Show this help information" }
     )
     
     foreach ($action in $actions) {
@@ -621,17 +1088,34 @@ function Show-Help {
     Write-ColoredOutput "  .\manage-load-tests.ps1 test-verbose -VerboseOutput" "Success"
     Write-ColoredOutput "  .\manage-load-tests.ps1 dashboard" "Success"
     
+    Write-ColoredOutput "`n✨ New Environment Management (Phase 4):" "Warning"
+    Write-ColoredOutput "  .\manage-load-tests.ps1 setup-full" "Success"
+    Write-ColoredOutput "  .\manage-load-tests.ps1 setup-full -Mode docker -IncludeMonitoring" "Success"
+    Write-ColoredOutput "  .\manage-load-tests.ps1 run-all" "Success"
+    Write-ColoredOutput "  .\manage-load-tests.ps1 run-all -IncludeExtreme -SimpleOnly" "Success"
+    Write-ColoredOutput "  .\manage-load-tests.ps1 teardown" "Success"
+    Write-ColoredOutput "  .\manage-load-tests.ps1 teardown -RemoveVolumes -RemoveImages" "Success"
+    
     Write-ColoredOutput "`n📁 Replaced Scripts:" "Warning"
     Write-ColoredOutput "  • clean-test-results.ps1 → clean-all action" "Info"
     Write-ColoredOutput "  • test-script.ps1 → test-verbose action" "Info"
+    Write-ColoredOutput "  • setup-full-environment.ps1 → setup-full action (✨ NEW)" "Info"
+    Write-ColoredOutput "  • teardown-environment.ps1 → teardown action (✨ NEW)" "Info"
+    Write-ColoredOutput "  • run-all-load-tests.ps1 → run-all action (✨ NEW)" "Info"
     
     Write-ColoredOutput "`n🔧 Additional Parameters:" "Warning"
-    Write-ColoredOutput "  -BaseUrl        : Target URL (default: http://localhost:5000)" "Info"
-    Write-ColoredOutput "  -DaysOld        : Age threshold for cleanup (default: 7)" "Info"
-    Write-ColoredOutput "  -WhatIf         : Preview what would be deleted (clean-all only)" "Info"
-    Write-ColoredOutput "  -VerboseOutput  : Enable detailed logging" "Info"
-    Write-ColoredOutput "  -GenerateReport : Create report after tests" "Info"
-    Write-ColoredOutput "  -SkipHealthCheck: Skip service health verification" "Info"
+    Write-ColoredOutput "  -BaseUrl          : Target URL (default: http://localhost:5000)" "Info"
+    Write-ColoredOutput "  -DaysOld          : Age threshold for cleanup (default: 7)" "Info"
+    Write-ColoredOutput "  -WhatIf           : Preview what would be deleted (clean-all only)" "Info"
+    Write-ColoredOutput "  -VerboseOutput    : Enable detailed logging" "Info"
+    Write-ColoredOutput "  -GenerateReport   : Create report after tests" "Info"
+    Write-ColoredOutput "  -SkipHealthCheck  : Skip service health verification" "Info"
+    Write-ColoredOutput "  -Mode             : Setup mode: docker/local/hybrid (setup-full)" "Info"
+    Write-ColoredOutput "  -IncludeMonitoring: Start monitoring stack (setup-full)" "Info"
+    Write-ColoredOutput "  -RemoveVolumes    : Remove Docker volumes (teardown)" "Info"
+    Write-ColoredOutput "  -RemoveImages     : Remove Docker images (teardown)" "Info"
+    Write-ColoredOutput "  -IncludeExtreme   : Include 500 users test (run-all)" "Info"
+    Write-ColoredOutput "  -SimpleOnly       : Run only simple scenarios (run-all)" "Info"
 }
 
 function Invoke-DashboardGeneration {
@@ -718,8 +1202,8 @@ try {
         }
     }
     
-    # Verificar salud del servicio (excepto para install, clean, test-verbose, dashboard y help)
-    if ($Action -notin @("install", "clean", "clean-all", "report", "test-verbose", "dashboard")) {
+    # Verificar salud del servicio (excepto para install, clean, test-verbose, dashboard, setup-full, teardown y help)
+    if ($Action -notin @("install", "clean", "clean-all", "report", "test-verbose", "dashboard", "setup-full", "teardown", "help")) {
         if (-not (Test-ServiceHealth -Url $BaseUrl)) {
             Write-ColoredOutput "❌ Service is not healthy. Please check the Gateway is running." "Error"
             exit 1
@@ -788,6 +1272,21 @@ try {
         
         "dashboard" {
             Invoke-DashboardGeneration
+        }
+        
+        "setup-full" {
+            $result = Initialize-FullEnvironment -Mode $Mode -IncludeMonitoring:$IncludeMonitoring -WaitTime $WaitTime
+            if (-not $result) { exit 1 }
+        }
+        
+        "teardown" {
+            $result = Invoke-Teardown -RemoveVolumes:$RemoveVolumes -RemoveImages:$RemoveImages
+            if (-not $result) { exit 1 }
+        }
+        
+        "run-all" {
+            $result = Invoke-RunAllTests -IncludeExtreme:$IncludeExtreme -SimpleOnly:$SimpleOnly
+            if (-not $result) { exit 1 }
         }
         
         default {

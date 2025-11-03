@@ -1,0 +1,67 @@
+services:
+  # Gateway API
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: accessibility-gateway-load
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Redis__ConnectionString=redis:6379
+    depends_on:
+      - redis
+    networks:
+      - load-test-network
+    labels:
+      - "com.docker.compose.project=accessibility-load-test"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: accessibility-redis-load
+    ports:
+      - "6379:6379"
+    networks:
+      - load-test-network
+    labels:
+      - "com.docker.compose.project=accessibility-load-test"
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: accessibility-prometheus-load
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - load-test-network
+    labels:
+      - "com.docker.compose.project=accessibility-load-test"
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: accessibility-grafana-load
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+    networks:
+      - load-test-network
+    labels:
+      - "com.docker.compose.project=accessibility-load-test"
+
+networks:
+  load-test-network:
+    driver: bridge
+    labels:
+      - "com.docker.compose.project=accessibility-load-test"

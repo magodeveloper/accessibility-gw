@@ -1,9 +1,9 @@
 using Xunit;
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
+using FluentAssertions;
 using Gateway.Services;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace Gateway.UnitTests.Services
 {

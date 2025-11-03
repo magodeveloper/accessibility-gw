@@ -2,25 +2,25 @@
 // Configuración centralizada para las pruebas de carga del Gateway
 
 export const config = {
-    // URLs base
-    baseUrl: __ENV.BASE_URL || 'http://localhost:5000',
+    // URLs base - Usar variable de entorno o default a puerto 8100 (Gateway)
+    baseUrl: __ENV.BASE_URL || 'http://localhost:8100',
 
     // Configuraciones de carga por usuarios concurrentes
     concurrentUsers: {
         light: {
-            users: parseInt(__ENV.USERS) || 20,
+            users: Number.parseInt(__ENV.USERS) || 20,
             duration: __ENV.DURATION || '5m'
         },
         medium: {
-            users: parseInt(__ENV.USERS) || 50,
+            users: Number.parseInt(__ENV.USERS) || 50,
             duration: __ENV.DURATION || '5m'
         },
         high: {
-            users: parseInt(__ENV.USERS) || 100,
+            users: Number.parseInt(__ENV.USERS) || 100,
             duration: __ENV.DURATION || '10m'
         },
         extreme: {
-            users: parseInt(__ENV.USERS) || 500,
+            users: Number.parseInt(__ENV.USERS) || 500,
             duration: __ENV.DURATION || '15m'
         }
     },
@@ -58,8 +58,8 @@ export const config = {
 
     // Configuración de sleep
     sleep: {
-        min: parseFloat(__ENV.SLEEP_MIN) || 0.5,
-        max: parseFloat(__ENV.SLEEP_MAX) || 2.0
+        min: Number.parseFloat(__ENV.SLEEP_MIN) || 0.5,
+        max: Number.parseFloat(__ENV.SLEEP_MAX) || 2
     }
 };
 
@@ -154,7 +154,7 @@ export function validateGatewayResponse(response, expectedStatus = 200) {
 
     if (response.status === 200 && response.body) {
         try {
-            const json = JSON.parse(response.body);
+            JSON.parse(response.body);
             checks['valid json response'] = true;
         } catch (e) {
             checks['valid json response'] = false;
@@ -170,4 +170,20 @@ export function getConfigForUsers(userCount) {
     if (userCount <= 50) return 'medium';
     if (userCount <= 100) return 'high';
     return 'extreme';
+}
+
+// Función para obtener thresholds completos para un nivel de carga
+export function getThresholdsForLevel(level) {
+    const baseThresholds = config.thresholds[level] || config.thresholds.light;
+
+    return {
+        // Thresholds HTTP básicos de K6
+        http_req_duration: baseThresholds.http_req_duration,
+        http_req_failed: baseThresholds.http_req_failed,
+        http_reqs: baseThresholds.http_reqs,
+
+        // Métricas adicionales (si se usan en los scenarios)
+        iteration_duration: ['avg<5000'],
+        iterations: ['count>0']
+    };
 }

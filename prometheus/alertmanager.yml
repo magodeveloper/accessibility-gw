@@ -1,0 +1,314 @@
+# ============================================
+# Configuración de Alertmanager
+# Sistema de Accesibilidad - Notificaciones de Alertas
+# ============================================
+
+global:
+  # Tiempo de espera antes de resolver una alerta automáticamente
+  resolve_timeout: 5m
+  
+  # Configuración de SMTP (Email) - DESCOMENTAR Y CONFIGURAR
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alerts@accessibility-platform.com'
+  # smtp_auth_username: 'alerts@accessibility-platform.com'
+  # smtp_auth_password: 'your-app-password'
+  # smtp_require_tls: true
+  
+  # Configuración de Slack - DESCOMENTAR Y CONFIGURAR
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+# ============================================
+# Templates de Mensajes
+# ============================================
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# ============================================
+# Rutas de Enrutamiento
+# ============================================
+route:
+  # Receptor por defecto
+  receiver: 'default-receiver'
+  
+  # Agrupación de alertas
+  group_by: ['alertname', 'severity', 'component']
+  
+  # Tiempos de espera para agrupación
+  group_wait: 30s         # Esperar 30s antes de enviar el primer grupo
+  group_interval: 5m      # Esperar 5m antes de enviar nuevas alertas del mismo grupo
+  repeat_interval: 4h     # Reenviar cada 4 horas si la alerta persiste
+  
+  # Rutas específicas por severidad y componente
+  routes:
+    # ========================================
+    # ALERTAS CRÍTICAS - Notificación inmediata
+    # ========================================
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s       # Enviar rápidamente las críticas
+      repeat_interval: 30m  # Recordar cada 30 min
+      continue: true        # Continuar evaluando otras rutas
+      
+      routes:
+        # Microservicios críticos
+        - match:
+            component: microservice
+          receiver: 'critical-microservices'
+          
+        # Gateway crítico
+        - match:
+            component: gateway
+          receiver: 'critical-gateway'
+          
+        # Middleware crítico
+        - match:
+            component: middleware
+          receiver: 'critical-middleware'
+    
+    # ========================================
+    # ALERTAS DE WARNING - Notificación agrupada
+    # ========================================
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 2h
+      
+      routes:
+        # Performance warnings
+        - match:
+            team: platform
+          receiver: 'platform-warnings'
+          
+        # Analysis warnings
+        - match:
+            team: analysis
+          receiver: 'analysis-warnings'
+    
+    # ========================================
+    # ALERTAS INFO - Notificación diaria
+    # ========================================
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 5m
+      group_interval: 1h
+      repeat_interval: 24h
+    
+    # ========================================
+    # Database Alerts
+    # ========================================
+    - match_re:
+        alertname: '.*(Database|DB).*'
+      receiver: 'database-alerts'
+      group_wait: 30s
+      repeat_interval: 1h
+    
+    # ========================================
+    # Browser Pool Alerts (Middleware)
+    # ========================================
+    - match_re:
+        alertname: 'BrowserPool.*'
+      receiver: 'middleware-browser-alerts'
+      group_wait: 1m
+      repeat_interval: 30m
+
+# ============================================
+# Inhibición de Alertas (Silenciar alertas dependientes)
+# ============================================
+inhibit_rules:
+  # Si un servicio está DOWN, no alertar sobre latencia/errores
+  - source_match:
+      severity: 'critical'
+      alertname: 'ServiceDown'
+    target_match_re:
+      severity: 'warning|info'
+      alertname: '.*(Latency|ErrorRate|Traffic).*'
+    equal: ['service']
+  
+  # Si el middleware está DOWN, no alertar sobre browser pool
+  - source_match:
+      severity: 'critical'
+      alertname: 'MiddlewareDown'
+    target_match_re:
+      alertname: 'BrowserPool.*'
+    equal: ['job']
+  
+  # Si hay alerta crítica de memoria, silenciar warning de memoria
+  - source_match:
+      severity: 'critical'
+      alertname: 'CriticalMemoryUsage'
+    target_match:
+      severity: 'warning'
+      alertname: 'HighMemoryUsage'
+    equal: ['service']
+  
+  # Si el health check falló, no alertar sobre otros síntomas
+  - source_match:
+      alertname: 'HealthCheckFailed'
+    target_match_re:
+      alertname: '.*(Latency|ErrorRate).*'
+    equal: ['service']
+
+# ============================================
+# Receptores de Notificaciones
+# ============================================
+receivers:
+  # Receptor por defecto (logs solamente)
+  - name: 'default-receiver'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/default'
+        send_resolved: true
+  
+  # ========================================
+  # CRÍTICAS - Múltiples canales
+  # ========================================
+  - name: 'critical-alerts'
+    # Email (DESCOMENTAR Y CONFIGURAR)
+    # email_configs:
+    #   - to: 'team-platform@company.com,oncall@company.com'
+    #     headers:
+    #       Subject: '🔴 CRITICAL: {{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}'
+    #     html: '{{ template "email.critical.html" . }}'
+    #     send_resolved: true
+    
+    # Slack (DESCOMENTAR Y CONFIGURAR)
+    # slack_configs:
+    #   - channel: '#alerts-critical'
+    #     username: 'Alertmanager'
+    #     icon_emoji: ':rotating_light:'
+    #     title: '🔴 CRITICAL ALERT'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+    #     send_resolved: true
+    #     actions:
+    #       - type: button
+    #         text: 'View Dashboard'
+    #         url: '{{ (index .Alerts 0).Annotations.dashboard_url }}'
+    #       - type: button
+    #         text: 'View Runbook'
+    #         url: '{{ (index .Alerts 0).Annotations.runbook_url }}'
+    
+    # Webhook para integración personalizada
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/critical'
+        send_resolved: true
+        # http_config:
+        #   bearer_token_file: '/path/to/your-webhook-secret-token-file'
+  
+  - name: 'critical-microservices'
+    # email_configs:
+    #   - to: 'team-backend@company.com'
+    #     headers:
+    #       Subject: '🔴 CRITICAL: Microservicio {{ .GroupLabels.service }} DOWN'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/critical-microservices'
+        send_resolved: true
+  
+  - name: 'critical-gateway'
+    # email_configs:
+    #   - to: 'team-platform@company.com,team-devops@company.com'
+    #     headers:
+    #       Subject: '🔴 CRITICAL: Gateway DOWN - Toda la plataforma afectada'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/critical-gateway'
+        send_resolved: true
+  
+  - name: 'critical-middleware'
+    # email_configs:
+    #   - to: 'team-analysis@company.com'
+    #     headers:
+    #       Subject: '🔴 CRITICAL: Middleware de Análisis {{ .GroupLabels.alertname }}'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/critical-middleware'
+        send_resolved: true
+  
+  # ========================================
+  # WARNINGS
+  # ========================================
+  - name: 'warning-alerts'
+    # slack_configs:
+    #   - channel: '#alerts-warnings'
+    #     username: 'Alertmanager'
+    #     icon_emoji: ':warning:'
+    #     title: '⚠️ WARNING'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/warnings'
+        send_resolved: true
+  
+  - name: 'platform-warnings'
+    # email_configs:
+    #   - to: 'team-platform@company.com'
+    #     headers:
+    #       Subject: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/platform-warnings'
+        send_resolved: true
+  
+  - name: 'analysis-warnings'
+    # email_configs:
+    #   - to: 'team-analysis@company.com'
+    #     headers:
+    #       Subject: '⚠️ WARNING: Análisis - {{ .GroupLabels.alertname }}'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/analysis-warnings'
+        send_resolved: true
+  
+  # ========================================
+  # INFO - Bajo volumen
+  # ========================================
+  - name: 'info-alerts'
+    # slack_configs:
+    #   - channel: '#alerts-info'
+    #     username: 'Alertmanager'
+    #     icon_emoji: ':information_source:'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/info'
+        send_resolved: true
+  
+  # ========================================
+  # Database Alerts
+  # ========================================
+  - name: 'database-alerts'
+    # email_configs:
+    #   - to: 'team-database@company.com,team-backend@company.com'
+    #     headers:
+    #       Subject: 'Database Alert: {{ .GroupLabels.alertname }}'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/database'
+        send_resolved: true
+  
+  # ========================================
+  # Browser Pool (Middleware específico)
+  # ========================================
+  - name: 'middleware-browser-alerts'
+    # email_configs:
+    #   - to: 'team-analysis@company.com'
+    #     headers:
+    #       Subject: '⚠️ Browser Pool: {{ .GroupLabels.alertname }}'
+    webhook_configs:
+      - url: 'http://localhost:9093/webhook/browser-pool'
+        send_resolved: true
+
+# ============================================
+# Configuración de Timeouts
+# ============================================
+# time_intervals:
+#   # Horario laboral (9 AM - 6 PM, Lunes-Viernes)
+#   - name: business-hours
+#     time_intervals:
+#       - times:
+#         - start_time: '09:00'
+#           end_time: '18:00'
+#         weekdays: ['monday:friday']
+#   
+#   # Fuera de horario
+#   - name: after-hours
+#     time_intervals:
+#       - times:
+#         - start_time: '18:00'
+#           end_time: '09:00'
+#         weekdays: ['monday:friday']
+#       - weekdays: ['saturday', 'sunday']

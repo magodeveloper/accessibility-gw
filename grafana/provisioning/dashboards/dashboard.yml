@@ -1,0 +1,16 @@
+# Configuración de provisionamiento de dashboards
+# Los dashboards en el directorio especificado se cargan automáticamente
+
+apiVersion: 1
+
+providers:
+  - name: 'Accessibility Platform Dashboards'
+    orgId: 1
+    folder: 'Accessibility'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: true

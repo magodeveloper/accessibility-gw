@@ -1,0 +1,1019 @@
+# ============================================
+# Prometheus Alert Rules
+# ============================================
+# Alertas para monitoreo proactivo de la plataforma de accesibilidad
+# Incluye alertas para microservicios, performance, recursos y disponibilidad
+
+groups:
+  # ============================================
+  # Alertas de Disponibilidad de Servicios
+  # ============================================
+  - name: service_availability
+    interval: 30s
+    rules:
+      # Servicio completamente DOWN
+      - alert: ServiceDown
+        expr: up{job=~".*-microservice|accessibility-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "🔴 Servicio {{ $labels.job }} está DOWN"
+          description: |
+            El servicio {{ $labels.job }} ha estado DOWN por más de 1 minuto.
+            Instance: {{ $labels.instance }}
+            Job: {{ $labels.job }}
+            
+            ACCIONES INMEDIATAS:
+            1. Verificar logs: docker logs {{ $labels.instance }}
+            2. Verificar contenedor: docker ps | grep {{ $labels.instance }}
+            3. Reiniciar si es necesario: docker restart {{ $labels.instance }}
+            4. Verificar health endpoint: curl http://{{ $labels.instance }}/health
+          
+          runbook_url: "https://docs.accessibility-platform.com/runbooks/service-down"
+          dashboard_url: "http://localhost:3010/d/{{ $labels.job }}"
+      
+      # Servicio intermitente (flapping)
+      - alert: ServiceFlapping
+        expr: changes(up{job=~".*-microservice"}[5m]) > 2
+        for: 2m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Servicio {{ $labels.job }} está inestable"
+          description: |
+            El servicio {{ $labels.job }} ha tenido {{ $value }} cambios de estado en los últimos 5 minutos.
+            Esto indica inestabilidad o problemas de configuración.
+            
+            ACCIONES:
+            1. Revisar logs para errores recurrentes
+            2. Verificar health checks
+            3. Revisar recursos del sistema
+            4. Considerar aumentar timeouts de health checks
+
+  # ============================================
+  # Alertas de Latencia y Performance
+  # ============================================
+  - name: performance
+    interval: 30s
+    rules:
+      # Alta latencia p95
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job=~".*-microservice"}[5m]))
+            by (job, le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Alta latencia en {{ $labels.job }}"
+          description: |
+            El servicio {{ $labels.job }} tiene una latencia p95 de {{ $value | humanizeDuration }}.
+            El umbral es 1 segundo.
+            
+            POSIBLES CAUSAS:
+            - Alto uso de CPU o memoria
+            - Consultas lentas a base de datos
+            - Problemas de red
+            - Falta de recursos
+            
+            ACCIONES:
+            1. Revisar panel de latencia en Grafana
+            2. Identificar endpoints lentos
+            3. Revisar logs de base de datos
+            4. Considerar escalado horizontal
+          
+          dashboard_url: "http://localhost:3010/d/{{ $labels.job }}"
+      
+      # Latencia extrema p99
+      - alert: ExtremeLatencyP99
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{job=~".*-microservice"}[5m]))
+            by (job, le)
+          ) > 3
+        for: 3m
+        labels:
+          severity: critical
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "🔴 Latencia crítica en {{ $labels.job }}"
+          description: |
+            El servicio {{ $labels.job }} tiene una latencia p99 de {{ $value | humanizeDuration }}.
+            Esto afecta significativamente a los usuarios.
+            
+            ACCIONES INMEDIATAS:
+            1. Revisar dashboard de Grafana
+            2. Identificar endpoints problemáticos
+            3. Considerar despliegue de rollback
+            4. Escalar recursos si es necesario
+      
+      # Alto tiempo de respuesta promedio
+      - alert: HighAverageResponseTime
+        expr: |
+          sum(rate(http_request_duration_seconds_sum{job=~".*-microservice"}[5m]))
+          /
+          sum(rate(http_request_duration_seconds_count{job=~".*-microservice"}[5m]))
+          by (job) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Tiempo de respuesta promedio alto en {{ $labels.job }}"
+          description: |
+            Tiempo de respuesta promedio: {{ $value | humanizeDuration }}
+            Umbral: 500ms
+            
+            Esto puede indicar degradación general del servicio.
+
+  # ============================================
+  # Alertas de Tasa de Errores
+  # ============================================
+  - name: error_rate
+    interval: 30s
+    rules:
+      # Alta tasa de errores 5xx
+      - alert: HighErrorRate5xx
+        expr: |
+          sum(rate(http_requests_received_total{job=~".*-microservice",code=~"5.."}[5m])) by (job)
+          /
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[5m])) by (job)
+          > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "🔴 Alta tasa de errores 5xx en {{ $labels.job }}"
+          description: |
+            Tasa de errores 5xx: {{ $value | humanizePercentage }}
+            Umbral: 5%
+            
+            Los errores 5xx indican problemas en el servidor.
+            
+            ACCIONES INMEDIATAS:
+            1. Revisar logs del servicio
+            2. Identificar causa raíz del error
+            3. Verificar conectividad con base de datos
+            4. Considerar rollback si es nuevo despliegue
+            
+            LOGS:
+            docker logs {{ $labels.instance }} --tail 100
+      
+      # Tasa moderada de errores 5xx
+      - alert: ModerateErrorRate5xx
+        expr: |
+          sum(rate(http_requests_received_total{job=~".*-microservice",code=~"5.."}[5m])) by (job)
+          /
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[5m])) by (job)
+          > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Tasa elevada de errores 5xx en {{ $labels.job }}"
+          description: |
+            Tasa de errores 5xx: {{ $value | humanizePercentage }}
+            Umbral: 1%
+            
+            Monitorear de cerca, puede escalar a crítico.
+      
+      # Alta tasa de errores 4xx
+      - alert: HighErrorRate4xx
+        expr: |
+          sum(rate(http_requests_received_total{job=~".*-microservice",code=~"4.."}[5m])) by (job)
+          /
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[5m])) by (job)
+          > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Alta tasa de errores 4xx en {{ $labels.job }}"
+          description: |
+            Tasa de errores 4xx: {{ $value | humanizePercentage }}
+            Umbral: 10%
+            
+            Errores 4xx indican problemas de validación o autenticación.
+            
+            POSIBLES CAUSAS:
+            - Cambios en API que rompen contratos
+            - Problemas de autenticación/autorización
+            - Validación de datos incorrecta
+            
+            ACCIONES:
+            1. Revisar cambios recientes en API
+            2. Verificar contratos con clientes
+            3. Revisar logs de validación
+      
+      # Pico repentino de errores
+      - alert: ErrorRateSpike
+        expr: |
+          (
+            sum(rate(http_requests_received_total{job=~".*-microservice",code=~"[45].."}[5m])) by (job)
+            /
+            sum(rate(http_requests_received_total{job=~".*-microservice"}[5m])) by (job)
+          )
+          >
+          (
+            sum(rate(http_requests_received_total{job=~".*-microservice",code=~"[45].."}[1h])) by (job)
+            /
+            sum(rate(http_requests_received_total{job=~".*-microservice"}[1h])) by (job)
+          ) * 5
+        for: 2m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Pico repentino de errores en {{ $labels.job }}"
+          description: |
+            La tasa de errores actual es 5x mayor que el promedio de la última hora.
+            
+            Puede indicar un problema reciente o despliegue problemático.
+
+  # ============================================
+  # Alertas de Recursos del Sistema
+  # ============================================
+  - name: system_resources
+    interval: 30s
+    rules:
+      # Alto uso de memoria
+      - alert: HighMemoryUsage
+        expr: process_working_set_bytes{job=~".*-microservice"} > 1073741824  # 1GB
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Alto uso de memoria en {{ $labels.job }}"
+          description: |
+            Uso de memoria: {{ $value | humanize1024 }}
+            Umbral: 1GB
+            
+            POSIBLES CAUSAS:
+            - Memory leak
+            - Carga de datos excesiva en memoria
+            - Falta de liberación de objetos
+            
+            ACCIONES:
+            1. Revisar panel de memoria en Grafana
+            2. Analizar GC collections
+            3. Considerar memory profiling
+            4. Revisar queries que cargan grandes datasets
+      
+      # Memoria crítica
+      - alert: CriticalMemoryUsage
+        expr: process_working_set_bytes{job=~".*-microservice"} > 1610612736  # 1.5GB
+        for: 3m
+        labels:
+          severity: critical
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "🔴 Uso crítico de memoria en {{ $labels.job }}"
+          description: |
+            Uso de memoria: {{ $value | humanize1024 }}
+            Umbral crítico: 1.5GB
+            
+            El servicio puede caerse pronto por OOM (Out Of Memory).
+            
+            ACCIONES INMEDIATAS:
+            1. Considerar reinicio del servicio
+            2. Escalar recursos si es posible
+            3. Investigar memory leak urgentemente
+      
+      # Alto uso de CPU
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total{job=~".*-microservice"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Alto uso de CPU en {{ $labels.job }}"
+          description: |
+            Uso de CPU: {{ $value | humanize }}%
+            Umbral: 80%
+            
+            POSIBLES CAUSAS:
+            - Alto tráfico
+            - Queries o procesamiento ineficiente
+            - Bucles infinitos
+            
+            ACCIONES:
+            1. Revisar dashboard de CPU
+            2. Identificar endpoints que consumen CPU
+            3. Revisar algoritmos costosos
+            4. Considerar escalado horizontal
+      
+      # CPU saturado
+      - alert: CPUSaturated
+        expr: rate(process_cpu_seconds_total{job=~".*-microservice"}[5m]) * 100 > 95
+        for: 3m
+        labels:
+          severity: critical
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "🔴 CPU saturado en {{ $labels.job }}"
+          description: |
+            Uso de CPU: {{ $value | humanize }}%
+            
+            El servicio está al límite de capacidad de CPU.
+            La performance se verá severamente afectada.
+            
+            ACCIONES INMEDIATAS:
+            1. Escalar servicio horizontalmente
+            2. Reducir carga si es posible
+            3. Investigar causa de alto consumo
+      
+      # Excesivas colecciones de GC Gen 2
+      - alert: ExcessiveGCGen2Collections
+        expr: rate(dotnet_gc_collection_count_total{job=~".*-microservice",generation="2"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Excesivas colecciones GC Gen 2 en {{ $labels.job }}"
+          description: |
+            Tasa de GC Gen 2: {{ $value }} collections/sec
+            
+            Las colecciones Gen 2 son costosas y pueden indicar presión de memoria.
+            
+            ACCIONES:
+            1. Revisar uso de memoria
+            2. Optimizar objetos de larga vida
+            3. Revisar memory leaks
+            4. Considerar ajustar configuración de GC
+      
+      # Alto número de threads
+      - alert: HighThreadCount
+        expr: process_num_threads{job=~".*-microservice"} > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Alto número de threads en {{ $labels.job }}"
+          description: |
+            Número de threads: {{ $value }}
+            Umbral: 100
+            
+            Un alto número de threads puede indicar problemas de concurrencia.
+
+  # ============================================
+  # Alertas de Base de Datos
+  # ============================================
+  - name: database
+    interval: 30s
+    rules:
+      # Health check de DB fallando
+      - alert: DatabaseHealthCheckFailed
+        expr: |
+          aspnetcore_healthcheck_status{job=~".*-microservice",name=~".*[Dd]atabase.*"} == 0
+          or
+          aspnetcore_healthcheck_status{job=~".*-microservice",name=~".*[Dd]b.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "🔴 Health check de base de datos fallando en {{ $labels.job }}"
+          description: |
+            El health check de base de datos está fallando.
+            Health check: {{ $labels.name }}
+            
+            ACCIONES INMEDIATAS:
+            1. Verificar conectividad con MySQL
+            2. Revisar logs del servicio
+            3. Verificar credenciales de DB
+            4. Verificar que el contenedor de MySQL esté UP
+            
+            VERIFICACIONES:
+            docker ps | grep mysql
+            docker logs <mysql-container>
+      
+      # Health check de DB lento
+      - alert: DatabaseHealthCheckSlow
+        expr: |
+          aspnetcore_healthcheck_duration_seconds{job=~".*-microservice",name=~".*[Dd]atabase.*"} > 1
+          or
+          aspnetcore_healthcheck_duration_seconds{job=~".*-microservice",name=~".*[Dd]b.*"} > 1
+        for: 3m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Health check de DB lento en {{ $labels.job }}"
+          description: |
+            Duración del health check: {{ $value | humanizeDuration }}
+            Umbral: 1 segundo
+            
+            Puede indicar problemas de performance en la base de datos.
+            
+            ACCIONES:
+            1. Revisar queries lentas en MySQL
+            2. Verificar índices
+            3. Revisar locks o deadlocks
+            4. Considerar optimización de queries
+
+  # ============================================
+  # Alertas de Tráfico y Capacidad
+  # ============================================
+  - name: traffic_capacity
+    interval: 30s
+    rules:
+      # Caída repentina de tráfico
+      - alert: TrafficDropped
+        expr: |
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[5m])) by (job)
+          <
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[1h])) by (job) * 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Caída significativa de tráfico en {{ $labels.job }}"
+          description: |
+            El tráfico actual es menos del 50% del promedio de la última hora.
+            
+            POSIBLES CAUSAS:
+            - Problema en el Gateway o balanceador
+            - Servicio parcialmente DOWN
+            - Problema en cliente/frontend
+            - Cambios en routing
+            
+            ACCIONES:
+            1. Verificar Gateway
+            2. Verificar logs de routing
+            3. Verificar frontend/clientes
+      
+      # Pico repentino de tráfico
+      - alert: TrafficSpike
+        expr: |
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[5m])) by (job)
+          >
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[1h])) by (job) * 3
+        for: 3m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Pico repentino de tráfico en {{ $labels.job }}"
+          description: |
+            El tráfico actual es 3x mayor que el promedio de la última hora.
+            
+            POSIBLES CAUSAS:
+            - Ataque DDoS
+            - Campaign o marketing
+            - Problema causando retries masivos
+            
+            ACCIONES:
+            1. Verificar origen del tráfico
+            2. Monitorear recursos del sistema
+            3. Considerar rate limiting
+            4. Escalar si es necesario
+      
+      # Sin tráfico (servicio idle)
+      - alert: NoTraffic
+        expr: |
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[10m])) by (job) == 0
+        for: 10m
+        labels:
+          severity: info
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "ℹ️ Sin tráfico en {{ $labels.job }}"
+          description: |
+            El servicio no ha recibido tráfico en los últimos 10 minutos.
+            
+            Esto puede ser normal fuera de horario laboral.
+            Verificar si es esperado.
+
+  # ============================================
+  # Alertas de Health Checks
+  # ============================================
+  - name: health_checks
+    interval: 30s
+    rules:
+      # Health check general fallando
+      - alert: HealthCheckFailed
+        expr: aspnetcore_healthcheck_status{job=~".*-microservice"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          check: "{{ $labels.name }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Health check fallando: {{ $labels.name }} en {{ $labels.job }}"
+          description: |
+            Health check: {{ $labels.name }}
+            Estado: Unhealthy
+            
+            ACCIONES:
+            1. Revisar logs del servicio
+            2. Identificar causa del fallo
+            3. Verificar dependencias
+      
+      # Memory health check fallando
+      - alert: MemoryHealthCheckFailed
+        expr: aspnetcore_healthcheck_status{job=~".*-microservice",name=~".*[Mm]emory.*"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          component: "{{ $labels.job }}"
+          team: backend
+        annotations:
+          summary: "⚠️ Memory health check fallando en {{ $labels.job }}"
+          description: |
+            El servicio está reportando problemas de memoria.
+            
+            ACCIONES:
+            1. Revisar uso de memoria actual
+            2. Considerar reinicio si es crítico
+            3. Investigar memory leak
+
+  # ============================================
+  # Recording Rules (Optimización)
+  # ============================================
+  # Pre-calcular queries frecuentes para mejorar performance
+  - name: recording_rules
+    interval: 30s
+    rules:
+      # Request rate por job
+      - record: job:http_request_rate:5m
+        expr: sum(rate(http_requests_received_total{job=~".*-microservice"}[5m])) by (job)
+      
+      # Error rate por job
+      - record: job:http_error_rate:5m
+        expr: |
+          sum(rate(http_requests_received_total{job=~".*-microservice",code=~"[45].."}[5m])) by (job)
+          /
+          sum(rate(http_requests_received_total{job=~".*-microservice"}[5m])) by (job)
+      
+      # Latencia p95 por job
+      - record: job:http_request_duration_seconds:p95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job=~".*-microservice"}[5m]))
+            by (job, le)
+          )
+      
+      # Latencia p99 por job
+      - record: job:http_request_duration_seconds:p99
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{job=~".*-microservice"}[5m]))
+            by (job, le)
+          )
+      
+      # CPU usage por job
+      - record: job:cpu_usage:5m
+        expr: rate(process_cpu_seconds_total{job=~".*-microservice"}[5m]) * 100
+      
+      # Memory usage por job
+      - record: job:memory_usage_bytes
+        expr: process_working_set_bytes{job=~".*-microservice"}
+
+  # ============================================
+  # Alertas Específicas del Middleware (Node.js)
+  # ============================================
+  - name: middleware_alerts
+    interval: 30s
+    rules:
+      # Middleware DOWN
+      - alert: MiddlewareDown
+        expr: up{job="accessibility-middleware"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "🔴 Middleware de Análisis está DOWN"
+          description: |
+            El middleware de análisis de accesibilidad ha estado DOWN por más de 1 minuto.
+            
+            IMPACTO:
+            - No se pueden realizar análisis de accesibilidad
+            - Funcionalidad principal de la plataforma afectada
+            
+            ACCIONES INMEDIATAS:
+            1. Verificar contenedor: docker ps | grep accessibility-mw
+            2. Revisar logs: docker logs accessibility-mw-prod --tail 100
+            3. Reiniciar: docker restart accessibility-mw-prod
+            4. Verificar health: curl http://accessibility-mw-prod:3001/health
+          
+          runbook_url: "https://docs.accessibility-platform.com/runbooks/middleware-down"
+          dashboard_url: "http://localhost:3000/d/accessibility-middleware"
+      
+      # Alta tasa de errores en análisis
+      - alert: MiddlewareHighErrorRate
+        expr: |
+          sum(rate(analysis_requests_total{job="accessibility-middleware",status="error"}[5m]))
+          /
+          sum(rate(analysis_requests_total{job="accessibility-middleware"}[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "⚠️ Alta tasa de errores en análisis de middleware"
+          description: |
+            Tasa de errores en análisis: {{ $value | humanizePercentage }}
+            Umbral: 5%
+            
+            POSIBLES CAUSAS:
+            - Sitios web no accesibles
+            - Timeouts de Playwright
+            - Problemas en motores de análisis (axe/IBM EA)
+            - Falta de recursos (memoria, CPU)
+            
+            ACCIONES:
+            1. Revisar logs del middleware
+            2. Verificar estado del browser pool
+            3. Revisar métricas de latencia
+            4. Verificar memoria y CPU
+          
+          dashboard_url: "http://localhost:3000/d/accessibility-middleware"
+      
+      # Error rate crítico en análisis
+      - alert: MiddlewareCriticalErrorRate
+        expr: |
+          sum(rate(analysis_requests_total{job="accessibility-middleware",status="error"}[5m]))
+          /
+          sum(rate(analysis_requests_total{job="accessibility-middleware"}[5m]))
+          > 0.20
+        for: 3m
+        labels:
+          severity: critical
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "🔴 Tasa crítica de errores en análisis de middleware"
+          description: |
+            Tasa de errores: {{ $value | humanizePercentage }}
+            Umbral crítico: 20%
+            
+            La mayoría de los análisis están fallando.
+            
+            ACCIONES INMEDIATAS:
+            1. Revisar logs inmediatamente
+            2. Verificar health del servicio
+            3. Considerar reinicio del servicio
+            4. Verificar dependencias (browser pool)
+      
+      # Alta latencia de análisis
+      - alert: MiddlewareHighAnalysisLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(analysis_duration_seconds_bucket{job="accessibility-middleware"}[5m]))
+            by (le, engine)
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "⚠️ Alta latencia en análisis de middleware"
+          description: |
+            Latencia p95: {{ $value | humanizeDuration }}
+            Umbral: 5 segundos
+            Engine: {{ $labels.engine }}
+            
+            POSIBLES CAUSAS:
+            - Sitios web lentos
+            - Alto uso de CPU/memoria
+            - Browser pool saturado
+            - Problemas de red
+            
+            ACCIONES:
+            1. Revisar dashboard de latencia
+            2. Verificar estado del browser pool
+            3. Revisar recursos del sistema
+            4. Considerar aumentar BROWSER_POOL_SIZE
+          
+          dashboard_url: "http://localhost:3000/d/accessibility-middleware"
+      
+      # Latencia extrema de análisis
+      - alert: MiddlewareExtremeAnalysisLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(analysis_duration_seconds_bucket{job="accessibility-middleware"}[5m]))
+            by (le, engine)
+          ) > 10
+        for: 3m
+        labels:
+          severity: critical
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "🔴 Latencia extrema en análisis de middleware"
+          description: |
+            Latencia p95: {{ $value | humanizeDuration }}
+            Umbral crítico: 10 segundos
+            
+            Los análisis están tomando demasiado tiempo.
+            
+            ACCIONES INMEDIATAS:
+            1. Verificar recursos inmediatamente
+            2. Revisar browser pool wait time
+            3. Considerar escalar recursos
+            4. Investigar causas de timeout
+      
+      # Browser Pool agotado
+      - alert: BrowserPoolExhausted
+        expr: browser_pool_size{job="accessibility-middleware",state="available"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "🔴 Browser Pool agotado - No hay navegadores disponibles"
+          description: |
+            No hay navegadores disponibles en el pool de Playwright.
+            Todos los navegadores están en uso.
+            
+            IMPACTO:
+            - Nuevos análisis tendrán que esperar
+            - Aumentará la latencia de análisis
+            - Posibles timeouts
+            
+            ACCIONES INMEDIATAS:
+            1. Revisar dashboard de browser pool
+            2. Verificar si hay navegadores bloqueados
+            3. Aumentar BROWSER_POOL_SIZE en .env
+            4. Reiniciar servicio si navegadores están bloqueados
+          
+          env_variable: BROWSER_POOL_SIZE
+          dashboard_url: "http://localhost:3000/d/accessibility-middleware"
+      
+      # Alto tiempo de espera en browser pool
+      - alert: BrowserPoolHighWaitTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(browser_pool_wait_time_seconds_bucket{job="accessibility-middleware"}[5m]))
+            by (le)
+          ) > 3
+        for: 5m
+        labels:
+          severity: warning
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "⚠️ Alto tiempo de espera en Browser Pool"
+          description: |
+            Tiempo de espera p95: {{ $value | humanizeDuration }}
+            Umbral: 3 segundos
+            
+            Los análisis tienen que esperar mucho para obtener un navegador.
+            
+            ACCIONES:
+            1. Verificar browser_pool_size actual
+            2. Considerar aumentar BROWSER_POOL_SIZE
+            3. Revisar si hay cuellos de botella
+          
+          recommendation: "Aumentar BROWSER_POOL_SIZE de 3 a 5"
+      
+      # Baja tasa de cache hit
+      - alert: MiddlewareLowCacheHitRate
+        expr: cache_hit_rate{job="accessibility-middleware"} < 0.50
+        for: 10m
+        labels:
+          severity: info
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "ℹ️ Baja tasa de cache hit en middleware"
+          description: |
+            Cache hit rate: {{ $value | humanizePercentage }}
+            Umbral: 50%
+            
+            La mayoría de las requests no encuentran resultados en cache.
+            Esto es normal si:
+            - El servicio acaba de reiniciarse
+            - Hay muchas URLs nuevas
+            - El TTL del cache es muy corto
+            
+            ACCIONES (Opcional):
+            1. Revisar CACHE_TTL_SECONDS (actual: {{ $value }})
+            2. Considerar aumentar CACHE_MAX_KEYS
+            3. Revisar patrones de uso
+      
+      # Cache hit rate crítico
+      - alert: MiddlewareCriticalCacheHitRate
+        expr: cache_hit_rate{job="accessibility-middleware"} < 0.20
+        for: 15m
+        labels:
+          severity: warning
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "⚠️ Cache hit rate muy bajo en middleware"
+          description: |
+            Cache hit rate: {{ $value | humanizePercentage }}
+            Umbral crítico: 20%
+            
+            Casi ningún análisis usa resultados cacheados.
+            Esto aumenta significativamente la carga del servicio.
+            
+            ACCIONES:
+            1. Verificar que CACHE_ENABLED=true
+            2. Revisar CACHE_TTL_SECONDS (¿muy corto?)
+            3. Verificar lógica de cache keys
+      
+      # Alto uso de memoria en Node.js
+      - alert: MiddlewareHighHeapMemory
+        expr: nodejs_heap_size_used_bytes{job="accessibility-middleware"} / 1024 / 1024 > 400
+        for: 5m
+        labels:
+          severity: warning
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "⚠️ Alto uso de memoria heap en middleware"
+          description: |
+            Heap memory usado: {{ $value | humanize1024 }}
+            Umbral: 400 MB
+            
+            POSIBLES CAUSAS:
+            - Memory leak
+            - Cache demasiado grande
+            - Navegadores no liberados correctamente
+            - Objetos grandes en memoria
+            
+            ACCIONES:
+            1. Revisar dashboard de memoria
+            2. Verificar que navegadores se cierren correctamente
+            3. Revisar tamaño del cache
+            4. Considerar reinicio si continúa creciendo
+          
+          dashboard_url: "http://localhost:3000/d/accessibility-middleware"
+      
+      # Memoria heap crítica
+      - alert: MiddlewareCriticalHeapMemory
+        expr: nodejs_heap_size_used_bytes{job="accessibility-middleware"} / 1024 / 1024 > 700
+        for: 3m
+        labels:
+          severity: critical
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "🔴 Uso crítico de memoria heap en middleware"
+          description: |
+            Heap memory usado: {{ $value | humanize1024 }}
+            Umbral crítico: 700 MB
+            
+            El proceso de Node.js puede caerse pronto por OOM.
+            
+            ACCIONES INMEDIATAS:
+            1. Reiniciar el servicio: docker restart accessibility-mw-prod
+            2. Investigar memory leak urgentemente
+            3. Revisar logs antes del reinicio
+      
+      # Event Loop bloqueado
+      - alert: MiddlewareEventLoopBlocked
+        expr: nodejs_eventloop_lag_seconds{job="accessibility-middleware"} > 1
+        for: 3m
+        labels:
+          severity: critical
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "🔴 Event Loop bloqueado en middleware"
+          description: |
+            Event loop lag: {{ $value | humanizeDuration }}
+            Umbral: 1 segundo
+            
+            El event loop de Node.js está bloqueado.
+            Esto afecta severamente la capacidad de respuesta.
+            
+            POSIBLES CAUSAS:
+            - Operaciones síncronas costosas
+            - CPU saturado
+            - Procesamiento pesado bloqueando el hilo principal
+            
+            ACCIONES INMEDIATAS:
+            1. Revisar uso de CPU
+            2. Identificar operaciones bloqueantes
+            3. Considerar mover procesamiento a workers
+            4. Reiniciar si persiste
+          
+          dashboard_url: "http://localhost:3000/d/accessibility-middleware"
+      
+      # Alto uso de CPU en Node.js
+      - alert: MiddlewareHighCPU
+        expr: rate(process_cpu_user_seconds_total{job="accessibility-middleware"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "⚠️ Alto uso de CPU en middleware"
+          description: |
+            CPU usage: {{ $value | humanize }}%
+            Umbral: 80%
+            
+            POSIBLES CAUSAS:
+            - Alto volumen de análisis concurrentes
+            - Procesamiento pesado de resultados
+            - Navegadores consumiendo CPU
+            
+            ACCIONES:
+            1. Revisar número de análisis concurrentes
+            2. Verificar browser pool size
+            3. Considerar escalado horizontal
+      
+      # Health check de middleware fallando
+      - alert: MiddlewareHealthCheckFailed
+        expr: |
+          probe_success{job="accessibility-middleware"} == 0
+          or
+          probe_http_status_code{job="accessibility-middleware"} != 200
+        for: 2m
+        labels:
+          severity: critical
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "🔴 Health check del middleware fallando"
+          description: |
+            El health check HTTP del middleware está fallando.
+            
+            ACCIONES INMEDIATAS:
+            1. Verificar endpoint: curl http://accessibility-mw-prod:3001/health
+            2. Revisar logs del servicio
+            3. Verificar dependencias (browser pool)
+            4. Reiniciar si es necesario
+      
+      # Sin tráfico de análisis
+      - alert: MiddlewareNoAnalysisTraffic
+        expr: |
+          sum(rate(analysis_requests_total{job="accessibility-middleware"}[10m])) == 0
+        for: 15m
+        labels:
+          severity: info
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "ℹ️ Sin análisis en middleware por 15 minutos"
+          description: |
+            El middleware no ha procesado análisis en los últimos 15 minutos.
+            
+            Esto puede ser normal fuera de horario laboral.
+            Verificar si es comportamiento esperado.
+      
+      # Pico de análisis concurrentes
+      - alert: MiddlewareHighConcurrentAnalysis
+        expr: |
+          sum(rate(analysis_requests_total{job="accessibility-middleware"}[5m])) * 60 > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: middleware
+          team: analysis
+        annotations:
+          summary: "⚠️ Alto volumen de análisis concurrentes"
+          description: |
+            Análisis por minuto: {{ $value }}
+            Umbral: 50 análisis/min
+            
+            ACCIONES:
+            1. Verificar recursos del sistema
+            2. Monitorear latencias
+            3. Verificar browser pool no esté agotado
+            4. Considerar rate limiting si no es tráfico legítimo

@@ -1,11 +1,11 @@
 using Xunit;
-using FluentAssertions;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Logging;
-using NSubstitute;
-using NSubstitute.ExceptionExtensions;
-using Gateway.Services;
 using System.Net;
+using NSubstitute;
+using Gateway.Services;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using NSubstitute.ExceptionExtensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Gateway.UnitTests.Services
 {

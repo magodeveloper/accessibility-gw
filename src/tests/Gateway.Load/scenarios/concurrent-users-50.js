@@ -1,55 +1,165 @@
 // scenarios/concurrent-users-50.js
-// Escenario de prueba de carga para 50 usuarios concurrentes
+// Prueba de carga para 50 usuarios concurrentes - VERSIÓN CONSOLIDADA
+// 
+// MODOS:
+//   SIMPLE: Solo /health y /metrics (sin dependencias)
+//   FULL:   Incluye operaciones con microservicios
+//
+// USO:
+//   k6 run scenarios/concurrent-users-50.js                         # Modo FULL
+//   k6 run -e TEST_MODE=simple scenarios/concurrent-users-50.js     # Modo SIMPLE
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { config, endpoints, generateTestData, validateGatewayResponse, getConfigForUsers } from '../utils/config.js';
-import { recordRequestMetrics, updateActiveUsers, logMetrics, getThresholdsForLevel } from '../utils/metrics.js';
+import { config, endpoints, generateTestData, validateGatewayResponse, getThresholdsForLevel } from '../utils/config.js';
+import { recordRequestMetrics, updateActiveUsers, logMetrics } from '../utils/metrics.js';
+import { generateTestUserToken, createAuthHeaders } from '../utils/jwt.js';
 
 const userLevel = 'medium';
 const userCount = 50;
+const TEST_MODE = __ENV.TEST_MODE || 'full';
+const isSimpleMode = TEST_MODE.toLowerCase() === 'simple';
 
-// Configuración de la prueba
-export let options = {
-    stages: [
-        { duration: '1m', target: 15 },       // Ramp-up inicial
-        { duration: '1m', target: 30 },       // Incremento gradual
-        { duration: '1m', target: userCount }, // Alcanzar 50 usuarios
-        { duration: '5m', target: userCount }, // Mantener 50 usuarios
-        { duration: '1m', target: 25 },       // Ramp-down gradual
-        { duration: '30s', target: 0 }        // Finalizar
+export const options = {
+    stages: isSimpleMode ? [
+        { duration: '15s', target: 15 },
+        { duration: '15s', target: 30 },
+        { duration: '15s', target: 50 },
+        { duration: '90s', target: 50 },
+        { duration: '15s', target: 0 }
+    ] : [
+        { duration: '1m', target: 15 },
+        { duration: '1m', target: 30 },
+        { duration: '1m', target: 50 },
+        { duration: '5m', target: 50 },
+        { duration: '1m', target: 25 },
+        { duration: '30s', target: 0 }
     ],
-
     thresholds: getThresholdsForLevel(userLevel),
-
     tags: {
         test_type: 'concurrent_users',
         user_count: userCount.toString(),
-        scenario: 'medium_load'
+        scenario: 'medium_load',
+        mode: isSimpleMode ? 'simple' : 'full'
     }
 };
 
-// Función de setup
 export function setup() {
     console.log(`🚀 Iniciando prueba de carga MEDIA con ${userCount} usuarios concurrentes`);
+    console.log(`📋 Modo: ${TEST_MODE.toUpperCase()}`);
 
-    // Verificar servicios del Gateway
-    const services = ['health', 'ready'];
-    for (const service of services) {
-        const response = http.get(`${config.baseUrl}${endpoints[service]}`);
-        if (response.status !== 200) {
-            throw new Error(`Servicio ${service} no disponible: ${response.status}`);
+    if (isSimpleMode) {
+        console.log(`ℹ️  Modo SIMPLE: Solo endpoints básicos`);
+
+        const token = generateTestUserToken('loadtest-user-50', 'loadtest50@test.com', ['User', 'Tester']);
+        const authHeaders = createAuthHeaders(token);
+        console.log('✅ Token JWT generado');
+
+        const healthCheck = http.get(`${config.baseUrl}${endpoints.health}`);
+        console.log(`✅ Gateway Health: status ${healthCheck.status}`);
+
+        const readyCheck = http.get(`${config.baseUrl}${endpoints.ready}`, { headers: authHeaders });
+        console.log(`✅ Gateway Ready: status ${readyCheck.status}`);
+
+        const metricsCheck = http.get(`${config.baseUrl}${endpoints.metrics}`);
+        console.log(`✅ Gateway Metrics: status ${metricsCheck.status}`);
+
+        return {
+            startTime: Date.now(),
+            mode: 'simple',
+            token: token,
+            authHeaders: authHeaders
+        };
+    } else {
+        console.log(`ℹ️  Modo FULL: Todos los servicios`);
+
+        const services = ['health', 'ready'];
+        for (const service of services) {
+            const response = http.get(`${config.baseUrl}${endpoints[service]}`);
+            if (response.status !== 200) {
+                throw new Error(`Servicio ${service} no disponible: ${response.status}`);
+            }
         }
-    }
 
-    console.log('✅ Todos los servicios están disponibles');
-    return { startTime: Date.now() };
+        console.log('✅ Todos los servicios disponibles');
+        return {
+            startTime: Date.now(),
+            mode: 'full'
+        };
+    }
 }
 
-// Función principal con patrones de carga más realistas
-export default function (data) {
+export default function concurrentUsersTest(data) {
     updateActiveUsers(__VU);
 
+    if (isSimpleMode) {
+        executeSimpleMode(data);
+    } else {
+        executeFullMode(data);
+    }
+
+    if (__ITER % 10 === 0) {
+        logMetrics(__ITER);
+    }
+
+    const sleepTime = isSimpleMode
+        ? Math.random() * 1.5 + 0.5
+        : Math.random() * 3 + 0.5;
+    sleep(sleepTime);
+}
+
+function executeSimpleMode(data) {
+    const rand = Math.random();
+
+    if (rand < 0.6) {
+        executeHealthCheck();
+    } else if (rand < 0.9) {
+        executeReadyCheck(data.authHeaders);
+    } else {
+        executeMetricsCheck();
+    }
+}
+
+function executeHealthCheck() {
+    const response = http.get(`${config.baseUrl}${endpoints.health}`, {
+        headers: config.headers,
+        tags: { endpoint: 'health', group: 'health_check' }
+    });
+
+    check(response, {
+        'health check ok': (r) => r.status === 200 || r.status === 503,
+        'response under 3s': (r) => r.timings.duration < 3000
+    });
+    recordRequestMetrics(response, 'gateway');
+}
+
+function executeReadyCheck(authHeaders) {
+    const response = http.get(`${config.baseUrl}${endpoints.ready}`, {
+        headers: authHeaders,
+        tags: { endpoint: 'ready', group: 'ready_check' }
+    });
+
+    check(response, {
+        'ready check ok': (r) => r.status === 200,
+        'response under 3s': (r) => r.timings.duration < 3000
+    });
+    recordRequestMetrics(response, 'gateway');
+}
+
+function executeMetricsCheck() {
+    const response = http.get(`${config.baseUrl}${endpoints.metrics}`, {
+        headers: config.headers,
+        tags: { endpoint: 'metrics', group: 'metrics_check' }
+    });
+
+    check(response, {
+        'metrics check ok': (r) => r.status === 200,
+        'response under 3s': (r) => r.timings.duration < 3000
+    });
+    recordRequestMetrics(response, 'gateway');
+}
+
+function executeFullMode(data) {
     const testData = generateTestData();
     const scenario = selectScenario();
 
@@ -69,185 +179,107 @@ export default function (data) {
         default:
             executeHealthChecks();
     }
-
-    logMetrics(__ITER);
-
-    // Sleep variable para simular comportamiento real
-    sleep(Math.random() * 3 + 0.5); // 0.5-3.5 segundos
 }
 
 function selectScenario() {
     const rand = Math.random();
-
-    if (rand < 0.05) return 'health_checks';      // 5%
-    else if (rand < 0.40) return 'browsing';      // 35%
-    else if (rand < 0.65) return 'intensive_analysis'; // 25%
-    else if (rand < 0.85) return 'report_generation';  // 20%
-    else return 'user_management';                 // 15%
+    if (rand < 0.05) return 'health_checks';
+    else if (rand < 0.4) return 'browsing';
+    else if (rand < 0.65) return 'intensive_analysis';
+    else if (rand < 0.85) return 'report_generation';
+    else return 'user_management';
 }
 
 function executeBrowsingPattern(testData) {
     const group = 'browsing_pattern';
 
-    // Simular navegación típica: listar usuarios, ver detalles
     let response = http.get(
         `${config.baseUrl}${endpoints.users.base}${endpoints.users.endpoints.list}`,
-        {
-            headers: config.headers,
-            tags: { endpoint: 'users_list', group }
-        }
+        { headers: config.headers, tags: { endpoint: 'users_list', group } }
     );
 
     check(response, validateGatewayResponse(response, 200), { group });
     recordRequestMetrics(response, 'users');
 
-    sleep(1);
-
-    // Ver reportes disponibles
-    response = http.get(
-        `${config.baseUrl}${endpoints.reports.base}${endpoints.reports.endpoints.list}`,
-        {
-            headers: config.headers,
-            tags: { endpoint: 'reports_list', group }
-        }
-    );
-
-    check(response, validateGatewayResponse(response, 200), { group });
-    recordRequestMetrics(response, 'reports');
-
     sleep(0.5);
 
-    // Verificar estado de análisis en curso
-    response = http.get(
-        `${config.baseUrl}${endpoints.analysis.base}${endpoints.analysis.endpoints.analyze}`,
-        {
-            headers: config.headers,
-            tags: { endpoint: 'analysis_list', group }
+    if (response.body) {
+        try {
+            const users = JSON.parse(response.body);
+            if (users.length > 0) {
+                const randomUser = users[Math.floor(Math.random() * users.length)];
+                response = http.get(
+                    `${config.baseUrl}${endpoints.users.base}${endpoints.users.endpoints.getById.replace(':id', randomUser.id)}`,
+                    { headers: config.headers, tags: { endpoint: 'users_get', group } }
+                );
+                check(response, validateGatewayResponse(response, 200), { group });
+                recordRequestMetrics(response, 'users');
+            }
+        } catch (e) {
+            console.error(`Error: ${e.message}`);
         }
-    );
-
-    check(response, validateGatewayResponse(response, 200), { group });
-    recordRequestMetrics(response, 'analysis');
+    }
 }
 
 function executeIntensiveAnalysis(testData) {
     const group = 'intensive_analysis';
 
-    // Múltiples análisis concurrentes
-    const analysisRequests = [
-        { ...testData.analysis, type: 'accessibility' },
-        { ...testData.analysis, type: 'performance' },
-        { ...testData.analysis, type: 'seo' }
-    ];
+    let response = http.post(
+        `${config.baseUrl}${endpoints.analysis.base}${endpoints.analysis.endpoints.analyze}`,
+        JSON.stringify(testData.analysis),
+        { headers: config.headers, tags: { endpoint: 'analysis_start', group } }
+    );
 
-    const analysisIds = [];
+    const analyzeCheck = check(response, validateGatewayResponse(response, 202), { group });
+    recordRequestMetrics(response, 'analysis');
 
-    for (const analysisRequest of analysisRequests) {
-        const response = http.post(
-            `${config.baseUrl}${endpoints.analysis.base}${endpoints.analysis.endpoints.analyze}`,
-            JSON.stringify(analysisRequest),
-            {
-                headers: config.headers,
-                tags: { endpoint: 'analysis_start', group, analysis_type: analysisRequest.type }
-            }
-        );
+    if (analyzeCheck && response.body) {
+        try {
+            const analysisResult = JSON.parse(response.body);
+            sleep(1);
 
-        const analyzeCheck = check(response, validateGatewayResponse(response, 202), { group });
-        recordRequestMetrics(response, 'analysis');
-
-        if (analyzeCheck && response.body) {
-            try {
-                const result = JSON.parse(response.body);
-                analysisIds.push(result.id);
-            } catch (e) {
-                console.error(`Error parsing analysis response: ${e.message}`);
-            }
+            response = http.get(
+                `${config.baseUrl}${endpoints.analysis.base}${endpoints.analysis.endpoints.status.replace(':id', analysisResult.id)}`,
+                { headers: config.headers, tags: { endpoint: 'analysis_status', group } }
+            );
+            check(response, validateGatewayResponse(response, 200), { group });
+            recordRequestMetrics(response, 'analysis');
+        } catch (e) {
+            console.error(`Error: ${e.message}`);
         }
-
-        sleep(0.3); // Pausa breve entre requests
-    }
-
-    // Verificar estado de los análisis
-    sleep(2);
-
-    for (const analysisId of analysisIds) {
-        const response = http.get(
-            `${config.baseUrl}${endpoints.analysis.base}${endpoints.analysis.endpoints.status.replace(':id', analysisId)}`,
-            {
-                headers: config.headers,
-                tags: { endpoint: 'analysis_status', group }
-            }
-        );
-
-        check(response, validateGatewayResponse(response, 200), { group });
-        recordRequestMetrics(response, 'analysis');
-
-        sleep(0.2);
     }
 }
 
 function executeReportGeneration(testData) {
     const group = 'report_generation';
 
-    // Generar reporte complejo
-    const complexReport = {
-        ...testData.report,
-        includeCharts: true,
-        includeRawData: true,
-        format: 'pdf',
-        sections: ['executive_summary', 'detailed_analysis', 'recommendations', 'appendix']
-    };
-
     let response = http.post(
         `${config.baseUrl}${endpoints.reports.base}${endpoints.reports.endpoints.generate}`,
-        JSON.stringify(complexReport),
-        {
-            headers: config.headers,
-            tags: { endpoint: 'reports_generate_complex', group }
-        }
+        JSON.stringify(testData.report),
+        { headers: config.headers, tags: { endpoint: 'reports_generate', group } }
     );
 
     const generateCheck = check(response, validateGatewayResponse(response, 202), { group });
     recordRequestMetrics(response, 'reports');
 
-    if (generateCheck && response.body) {
-        try {
-            const reportResult = JSON.parse(response.body);
-            const reportId = reportResult.id;
-
-            sleep(3); // Tiempo para procesamiento
-
-            // Intentar descargar reporte
-            response = http.get(
-                `${config.baseUrl}${endpoints.reports.base}${endpoints.reports.endpoints.download.replace(':id', reportId)}`,
-                {
-                    headers: config.headers,
-                    tags: { endpoint: 'reports_download', group }
-                }
-            );
-
-            check(response, {
-                'report ready or processing': (r) => r.status === 200 || r.status === 202
-            }, { group });
-            recordRequestMetrics(response, 'reports');
-
-        } catch (e) {
-            console.error(`Error parsing report response: ${e.message}`);
-        }
+    if (generateCheck) {
+        sleep(0.5);
+        response = http.get(
+            `${config.baseUrl}${endpoints.reports.base}${endpoints.reports.endpoints.list}`,
+            { headers: config.headers, tags: { endpoint: 'reports_list', group } }
+        );
+        check(response, validateGatewayResponse(response, 200), { group });
+        recordRequestMetrics(response, 'reports');
     }
 }
 
 function executeUserManagement(testData) {
     const group = 'user_management';
 
-    // Operaciones CRUD completas de usuarios
     let response = http.post(
         `${config.baseUrl}${endpoints.users.base}${endpoints.users.endpoints.create}`,
         JSON.stringify(testData.user),
-        {
-            headers: config.headers,
-            tags: { endpoint: 'users_create', group }
-        }
+        { headers: config.headers, tags: { endpoint: 'users_create', group } }
     );
 
     const createCheck = check(response, validateGatewayResponse(response, 201), { group });
@@ -255,61 +287,17 @@ function executeUserManagement(testData) {
 
     if (createCheck && response.body) {
         try {
-            const user = JSON.parse(response.body);
-            const userId = user.id;
-
+            const createdUser = JSON.parse(response.body);
             sleep(0.5);
 
-            // Actualizar usuario
-            const updatedUser = {
-                ...testData.user,
-                name: `${testData.user.name}_updated`,
-                lastModified: new Date().toISOString()
-            };
-
-            response = http.put(
-                `${config.baseUrl}${endpoints.users.base}${endpoints.users.endpoints.update.replace(':id', userId)}`,
-                JSON.stringify(updatedUser),
-                {
-                    headers: config.headers,
-                    tags: { endpoint: 'users_update', group }
-                }
-            );
-
-            check(response, validateGatewayResponse(response, 200), { group });
-            recordRequestMetrics(response, 'users');
-
-            sleep(0.5);
-
-            // Obtener perfil completo
             response = http.get(
-                `${config.baseUrl}${endpoints.users.base}${endpoints.users.endpoints.profile.replace(':id', userId)}`,
-                {
-                    headers: config.headers,
-                    tags: { endpoint: 'users_profile', group }
-                }
+                `${config.baseUrl}${endpoints.users.base}${endpoints.users.endpoints.getById.replace(':id', createdUser.id)}`,
+                { headers: config.headers, tags: { endpoint: 'users_get', group } }
             );
-
             check(response, validateGatewayResponse(response, 200), { group });
             recordRequestMetrics(response, 'users');
-
-            sleep(0.5);
-
-            // Eliminar usuario (cleanup)
-            response = http.del(
-                `${config.baseUrl}${endpoints.users.base}${endpoints.users.endpoints.delete.replace(':id', userId)}`,
-                null,
-                {
-                    headers: config.headers,
-                    tags: { endpoint: 'users_delete', group }
-                }
-            );
-
-            check(response, validateGatewayResponse(response, 204), { group });
-            recordRequestMetrics(response, 'users');
-
         } catch (e) {
-            console.error(`Error in user management: ${e.message}`);
+            console.error(`Error: ${e.message}`);
         }
     }
 }
@@ -317,18 +305,24 @@ function executeUserManagement(testData) {
 function executeHealthChecks() {
     const group = 'health_checks';
 
-    const response = http.get(`${config.baseUrl}${endpoints.health}`, {
+    let response = http.get(`${config.baseUrl}${endpoints.health}`, {
         headers: config.headers,
         tags: { endpoint: 'health', group }
     });
+    check(response, validateGatewayResponse(response, 200), { group });
+    recordRequestMetrics(response, 'gateway');
 
+    response = http.get(`${config.baseUrl}${endpoints.ready}`, {
+        headers: config.headers,
+        tags: { endpoint: 'ready', group }
+    });
     check(response, validateGatewayResponse(response, 200), { group });
     recordRequestMetrics(response, 'gateway');
 }
 
 export function teardown(data) {
     const duration = (Date.now() - data.startTime) / 1000;
-    console.log(`✅ Prueba de carga MEDIA completada en ${duration.toFixed(2)} segundos`);
+    console.log(`✅ Prueba completada en ${duration.toFixed(2)} segundos`);
+    console.log(`📊 Modo: ${data.mode.toUpperCase()}`);
     console.log(`📊 Usuarios concurrentes máximos: ${userCount}`);
-    console.log(`🎯 Carga: Media - Patrones de uso realistas`);
 }

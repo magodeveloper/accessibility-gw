@@ -1,13 +1,13 @@
+using Xunit;
 using Gateway;
+using WireMock.Server;
+using WireMock.Settings;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using WireMock.Server;
-using WireMock.Settings;
-using Xunit;
 
 namespace Gateway.IntegrationTests.Fixtures
 {

@@ -1,14 +1,14 @@
 using Xunit;
-using FluentAssertions;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Logging;
-using NSubstitute;
-using NSubstitute.ExceptionExtensions;
-using Gateway.Services;
-using Gateway.Models;
 using System.Text;
-using System.Text.Json;
 using System.Linq;
+using NSubstitute;
+using Gateway.Models;
+using System.Text.Json;
+using Gateway.Services;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using NSubstitute.ExceptionExtensions;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Gateway.UnitTests.Services;
 

@@ -1,13 +1,13 @@
 using Xunit;
-using FluentAssertions;
-using Gateway.Services;
-using Gateway.Models;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Yarp.ReverseProxy.Forwarder;
-using System.Net.Http;
 using NSubstitute;
+using Gateway.Models;
+using System.Net.Http;
+using Gateway.Services;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Yarp.ReverseProxy.Forwarder;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace Gateway.UnitTests.Services
 {

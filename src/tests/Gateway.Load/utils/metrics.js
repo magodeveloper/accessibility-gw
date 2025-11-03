@@ -118,41 +118,5 @@ export const defaultMetricsConfig = {
     vus_max: ['value']
 };
 
-// Thresholds personalizados para diferentes niveles de carga
-export const customThresholds = {
-    light: {
-        'gateway_error_rate': ['rate<0.005'],
-        'gateway_duration': ['p(95)<300', 'p(99)<500'],
-        'service_error_rate': ['rate<0.01'],
-        'timeout_rate': ['rate<0.001']
-    },
-
-    medium: {
-        'gateway_error_rate': ['rate<0.01'],
-        'gateway_duration': ['p(95)<500', 'p(99)<800'],
-        'service_error_rate': ['rate<0.02'],
-        'timeout_rate': ['rate<0.005']
-    },
-
-    high: {
-        'gateway_error_rate': ['rate<0.02'],
-        'gateway_duration': ['p(95)<800', 'p(99)<1200'],
-        'service_error_rate': ['rate<0.03'],
-        'timeout_rate': ['rate<0.01']
-    },
-
-    extreme: {
-        'gateway_error_rate': ['rate<0.05'],
-        'gateway_duration': ['p(95)<1500', 'p(99)<2000'],
-        'service_error_rate': ['rate<0.05'],
-        'timeout_rate': ['rate<0.02']
-    }
-};
-
-// Función para obtener thresholds basados en el nivel de carga
-export function getThresholdsForLevel(level) {
-    return {
-        ...defaultMetricsConfig,
-        ...customThresholds[level]
-    };
-}
+// ⚠️ NOTA: Los thresholds personalizados se definen en utils/config.js
+// Usar la función getThresholdsForLevel() desde config.js para obtener thresholds

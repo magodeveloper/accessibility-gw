@@ -6,8 +6,8 @@ import { check, sleep } from 'k6';
 import { randomIntBetween } from 'https://jslib.k6.io/k6-utils/1.2.0/index.js';
 import { config, endpoints, generateTestData, logResponse, validateGatewayResponse } from '../utils/config.js';
 
-// Configuración de prueba de picos
-export let options = {
+// Configuración de prueba de picos (spike)
+export const options = {
     stages: [
         { duration: '1m', target: 10 },   // Línea base normal
         { duration: '30s', target: 200 }, // Pico súbito #1
@@ -40,7 +40,7 @@ export let options = {
     }
 };
 
-export default function () {
+export default function spikeTest() {
     // Determinar fase actual basada en VUs activos
     const currentPhase = determinePhase(__VU);
 
@@ -130,7 +130,6 @@ function performBaselineOperations() {
 
 function performSpikeOperations() {
     const group = 'spike';
-    const testData = generateTestData();
 
     // Durante picos, simular múltiples operaciones rápidas
     const operations = randomIntBetween(1, 4);

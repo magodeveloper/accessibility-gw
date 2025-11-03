@@ -1,5 +1,5 @@
-using FluentAssertions;
 using Gateway.Models;
+using FluentAssertions;
 using Gateway.UnitTests.Helpers;
 
 namespace Gateway.UnitTests.Models;

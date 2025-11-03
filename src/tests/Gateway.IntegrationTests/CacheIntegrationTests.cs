@@ -1,15 +1,15 @@
+using Xunit;
+using System.Net;
+using System.Text;
+using FluentAssertions;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Caching.Distributed;
-using System.Text;
-using Xunit;
-using FluentAssertions;
-using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Caching.Memory;
-using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Gateway.IntegrationTests;
 

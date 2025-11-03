@@ -1,0 +1,204 @@
+# ============================================
+# Docker Compose - Monitoring Stack
+# Prometheus + Alertmanager + Grafana
+# ============================================
+
+services:
+  # ============================================
+  # Prometheus - Metrics Collection
+  # ============================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: accessibility-prometheus
+    restart: unless-stopped
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+      - "--log.level=info"
+
+    ports:
+      - "9090:9090"
+
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+
+    networks:
+      - accessibility-network
+
+    depends_on:
+      - alertmanager
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9090/-/healthy",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    labels:
+      - "com.accessibility.service=prometheus"
+      - "com.accessibility.component=monitoring"
+
+  # ============================================
+  # Alertmanager - Alert Routing & Notifications
+  # ============================================
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: accessibility-alertmanager
+    restart: unless-stopped
+
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.external-url=http://localhost:9093"
+      - "--log.level=info"
+
+    ports:
+      - "9093:9093"
+
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./prometheus/templates:/etc/alertmanager/templates:ro
+      - alertmanager-data:/alertmanager
+
+    networks:
+      - accessibility-network
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9093/-/healthy",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    labels:
+      - "com.accessibility.service=alertmanager"
+      - "com.accessibility.component=monitoring"
+
+  # ============================================
+  # Grafana - Dashboards & Visualization
+  # ============================================
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: accessibility-grafana
+    restart: unless-stopped
+
+    environment:
+      # Admin credentials
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+      # Server config
+      - GF_SERVER_ROOT_URL=http://localhost:3010
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+
+      # Auth config
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_BASIC_ENABLED=true
+
+      # Features
+      - GF_FEATURE_TOGGLES_ENABLE=publicDashboards
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/json/middleware-dashboard.json
+
+      # Plugins
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-clock-panel
+
+      # Alerting (Grafana Unified Alerting)
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - GF_ALERTING_ENABLED=false # Deshabilitar alerting legacy
+
+      # Log level
+      - GF_LOG_LEVEL=info
+
+    ports:
+      - "3010:3000"
+
+    volumes:
+      # Provisioning
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+
+      # Data persistence
+      - grafana-data:/var/lib/grafana
+
+      # Logs
+      - grafana-logs:/var/log/grafana
+
+    networks:
+      - accessibility-network
+
+    depends_on:
+      - prometheus
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    labels:
+      - "com.accessibility.service=grafana"
+      - "com.accessibility.component=monitoring"
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  accessibility-network:
+    name: accessibility-monitoring-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+# ============================================
+# Volumes (Persistencia)
+# ============================================
+volumes:
+  prometheus-data:
+    name: accessibility-prometheus-data
+    driver: local
+
+  alertmanager-data:
+    name: accessibility-alertmanager-data
+    driver: local
+
+  grafana-data:
+    name: accessibility-grafana-data
+    driver: local
+
+  grafana-logs:
+    name: accessibility-grafana-logs
+    driver: local

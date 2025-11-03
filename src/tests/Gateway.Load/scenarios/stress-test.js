@@ -7,7 +7,7 @@ import { randomIntBetween } from 'https://jslib.k6.io/k6-utils/1.2.0/index.js';
 import { config, endpoints, generateTestData, logResponse, validateGatewayResponse } from '../utils/config.js';
 
 // Configuración de prueba de estrés
-export let options = {
+export const options = {
     stages: [
         { duration: '2m', target: 50 },   // Ramp-up inicial
         { duration: '2m', target: 100 },  // Carga normal
@@ -41,7 +41,7 @@ export let options = {
     }
 };
 
-export default function () {
+export default function stressTest() {
     // Distribuir la carga entre diferentes tipos de operaciones
     const operation = randomIntBetween(1, 100);
 
@@ -305,7 +305,7 @@ function simulateProblematicUser() {
         `${config.baseUrl}${endpoints.reports.base}${endpoints.reports.endpoints.list}`
     ];
 
-    rapidRequests.forEach((url, index) => {
+    for (const [index, url] of rapidRequests.entries()) {
         const response = http.get(url, {
             headers: config.headers,
             tags: { endpoint: `rapid_${index}`, group }
@@ -316,7 +316,7 @@ function simulateProblematicUser() {
         }, {
             tags: { endpoint: `rapid_${index}`, group }
         });
-    });
+    }
 }
 
 export function setup() {

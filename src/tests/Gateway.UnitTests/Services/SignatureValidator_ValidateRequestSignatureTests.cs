@@ -1,9 +1,9 @@
+using Moq;
 using Xunit;
 using FluentAssertions;
 using Gateway.Services;
 using Gateway.UnitTests.Helpers;
 using Microsoft.Extensions.Logging;
-using Moq;
 
 namespace Gateway.UnitTests.Services;
 

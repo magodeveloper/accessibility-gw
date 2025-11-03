@@ -6,7 +6,7 @@ import { check, sleep } from 'k6';
 import { config, endpoints, generateTestData, logResponse, validateGatewayResponse } from '../utils/config.js';
 
 // Configuración del test de humo
-export let options = {
+export const options = {
     stages: [
         { duration: '30s', target: 1 }, // 1 usuario por 30 segundos
     ],
@@ -20,7 +20,7 @@ export let options = {
     }
 };
 
-export default function () {
+export default function smokeTest() {
     const testData = generateTestData();
 
     // 1. Health Check

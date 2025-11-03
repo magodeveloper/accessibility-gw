@@ -17,7 +17,7 @@ const userData = new SharedArray('users', function () {
 });
 
 // Configuración de carga normal
-export let options = {
+export const options = {
     stages: [
         { duration: '2m', target: 10 },  // Ramp-up gradual
         { duration: '5m', target: 50 },  // Carga sostenida normal
@@ -41,7 +41,7 @@ export let options = {
     }
 };
 
-export default function () {
+export default function loadTest() {
     // Simular diferentes tipos de usuarios
     const userType = randomIntBetween(1, 100);
 

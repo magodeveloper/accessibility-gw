@@ -1,0 +1,53 @@
+version: 2
+updates:
+  # Mantener dependencias de NuGet actualizadas
+  - package-ecosystem: 'nuget'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'America/New_York'
+    open-pull-requests-limit: 10
+    assignees:
+      - 'magodeveloper'
+    labels:
+      - 'dependencies'
+      - 'nuget'
+    commit-message:
+      prefix: 'chore(deps)'
+      include: 'scope'
+
+  # Mantener GitHub Actions actualizadas
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'monthly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'America/New_York'
+    assignees:
+      - 'magodeveloper'
+    labels:
+      - 'dependencies'
+      - 'ci'
+    commit-message:
+      prefix: 'chore(ci)'
+      include: 'scope'
+
+  # Mantener Dockerfile actualizado
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'America/New_York'
+    assignees:
+      - 'magodeveloper'
+    labels:
+      - 'dependencies'
+      - 'docker'
+    commit-message:
+      prefix: 'chore(docker)'
+      include: 'scope'

@@ -1,0 +1,154 @@
+# Configuración de Prometheus para el ecosistema de Accesibilidad
+# Scraping de métricas del Gateway y Microservicios
+
+global:
+  scrape_interval: 15s # Intervalo de scraping por defecto
+  evaluation_interval: 15s # Intervalo de evaluación de reglas
+  scrape_timeout: 10s # Timeout para scraping
+  
+  # Labels externos que se agregarán a todas las métricas
+  external_labels:
+    cluster: 'accessibility-platform'
+    environment: 'production'
+
+# ============================================
+# Reglas de Alertas y Recording Rules
+# ============================================
+rule_files:
+  - '/etc/prometheus/alerts.yml'
+
+# ============================================
+# Configuración de Alertmanager
+# ============================================
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'  # Alertmanager en Docker
+      timeout: 10s
+      api_version: v2
+
+# Configuración de scraping
+scrape_configs:
+  # ============================================
+  # Gateway API
+  # ============================================
+  - job_name: 'gateway'
+    static_configs:
+      - targets: ['host.docker.internal:8100']
+        labels:
+          service: 'gateway'
+          component: 'api-gateway'
+          team: 'platform'
+    
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    
+    # Relabeling para mejorar las métricas
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(http_.*|gateway_.*|process_.*|dotnet_.*)'
+        action: keep
+
+  # ============================================
+  # Microservicio de Users
+  # ============================================
+  - job_name: 'users-microservice'
+    static_configs:
+      - targets: ['host.docker.internal:8081']
+        labels:
+          service: 'users'
+          component: 'microservice'
+          team: 'backend'
+    
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(http_.*|users_.*|process_.*|dotnet_.*|microsoft_.*)'
+        action: keep
+
+  # ============================================
+  # Microservicio de Reports
+  # ============================================
+  - job_name: 'reports-microservice'
+    static_configs:
+      - targets: ['host.docker.internal:8083']
+        labels:
+          service: 'reports'
+          component: 'microservice'
+          team: 'backend'
+    
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 10s
+    
+    # Relabeling para mejorar las métricas
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(http_.*|reports_.*|process_.*|dotnet_.*|microsoft_.*)'
+        action: keep
+
+  # ============================================
+  # Microservicio de Analysis
+  # ============================================
+  - job_name: 'analysis-microservice'
+    static_configs:
+      - targets: ['host.docker.internal:8082']
+        labels:
+          service: 'analysis'
+          component: 'microservice'
+          team: 'backend'
+    
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 10s
+    
+    # Relabeling para mejorar las métricas
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(http_.*|analysis_.*|process_.*|dotnet_.*|microsoft_.*)'
+        action: keep
+
+  # ============================================
+  # Middleware de Análisis (Node.js)
+  # ============================================
+  - job_name: 'accessibility-middleware'
+    static_configs:
+      - targets: ['accessibility-mw:3001']
+        labels:
+          service: 'middleware'
+          component: 'analysis-engine'
+          team: 'analysis'
+    
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 10s
+    
+    # Relabeling para mejorar las métricas
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(http_.*|analysis_.*|browser_.*|cache_.*|nodejs_.*|process_.*|accessibility_.*)'
+        action: keep
+
+  # ============================================
+  # Prometheus self-monitoring
+  # ============================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
+
+# Configuración de alertas (opcional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Archivos de reglas (opcional)
+# rule_files:
+#   - '/etc/prometheus/rules/*.yml'
+

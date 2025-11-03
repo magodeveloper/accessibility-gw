@@ -20,6 +20,9 @@
         <!-- Documentación API -->
         <PackageVersion Include="Swashbuckle.AspNetCore" Version="7.1.0" />
         <PackageVersion Include="Swashbuckle.AspNetCore.Annotations" Version="6.8.1" />
+        <PackageVersion Include="Swashbuckle.AspNetCore.Filters" Version="8.0.2" />
+        <!-- Métricas -->
+        <PackageVersion Include="prometheus-net.AspNetCore" Version="8.2.1" />
         <!-- Caching y Redis -->
         <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
         <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.0" />

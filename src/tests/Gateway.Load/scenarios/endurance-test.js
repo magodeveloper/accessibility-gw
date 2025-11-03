@@ -7,7 +7,7 @@ import { randomIntBetween } from 'https://jslib.k6.io/k6-utils/1.2.0/index.js';
 import { config, endpoints, generateTestData, logResponse, validateGatewayResponse } from '../utils/config.js';
 
 // Configuración de prueba de resistencia
-export let options = {
+export const options = {
     stages: [
         { duration: '5m', target: 20 },   // Ramp-up gradual
         { duration: '30m', target: 20 },  // Carga sostenida por 30 minutos
@@ -43,7 +43,7 @@ let iterationCounter = 0;
 let errorCounter = 0;
 let memoryLeakDetector = [];
 
-export default function () {
+export default function enduranceTest() {
     iterationCounter++;
 
     // Determinar fase actual
@@ -208,7 +208,6 @@ function performSteadyStateOperations(phase) {
 
 function performPeriodicBurstOperations(phase) {
     const group = 'periodic_burst';
-    const testData = generateTestData();
 
     // Ráfagas periódicas de actividad
     const burstSize = randomIntBetween(3, 7);
@@ -305,7 +304,7 @@ function performMaintenanceOperations(phase) {
         }
     ];
 
-    maintenanceOperations.forEach((op, index) => {
+    for (const op of maintenanceOperations) {
         const response = http.get(op.url, {
             tags: { endpoint: op.name.toLowerCase().replace(' ', '_'), group, phase }
         });
@@ -317,7 +316,7 @@ function performMaintenanceOperations(phase) {
         if (!operationCheck) errorCounter++;
 
         sleep(1); // Pausa entre operaciones de mantenimiento
-    });
+    }
 
     // Verificar listas para detectar memory leaks
     const usersResponse = http.get(
@@ -403,7 +402,7 @@ function performMemoryIntensiveOperations(phase) {
 function detectMemoryLeaks() {
     if (memoryLeakDetector.length >= 5) {
         const first = memoryLeakDetector[0];
-        const last = memoryLeakDetector[memoryLeakDetector.length - 1];
+        const last = memoryLeakDetector.at(-1);
 
         const userGrowth = last.userCount - first.userCount;
         const responseGrowth = last.responseSize - first.responseSize;
@@ -457,7 +456,7 @@ export function teardown(data) {
     // Resumen de memory leak detection
     if (memoryLeakDetector.length > 0) {
         const first = memoryLeakDetector[0];
-        const last = memoryLeakDetector[memoryLeakDetector.length - 1];
+        const last = memoryLeakDetector.at(-1);
         console.log(`🧠 Memory analysis: Users ${first.userCount} → ${last.userCount}, Response size ${first.responseSize} → ${last.responseSize}`);
     }
 

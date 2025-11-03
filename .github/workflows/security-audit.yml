@@ -1,0 +1,62 @@
+name: "🔒 Security Audit & Vulnerability Scan"
+
+on:
+    push:
+        branches: [master, main]
+    pull_request:
+        branches: [master, main]
+    schedule:
+        - cron: "0 2 * * *" # daily at 02:00 UTC
+    workflow_dispatch:
+
+jobs:
+    trivy-image-scan:
+        name: Docker Image Scan (Trivy)
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build image for scanning
+              run: |
+                  docker build -t accessibility-gw-security:latest .
+
+            - name: Run Trivy scan on image
+              run: |
+                  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                    -v "$(pwd)":/project \
+                    aquasec/trivy:latest image --exit-code 0 --no-progress --format json \
+                    --output /project/trivy-report.json accessibility-gw-security:latest || true
+
+            - name: Upload Trivy Report
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: trivy-report-${{ github.sha }}
+                  path: trivy-report.json
+                  retention-days: 30
+
+    dependency-review:
+        name: Dependency Review (GitHub)
+        runs-on: ubuntu-latest
+        if: ${{ github.event_name == 'pull_request' }}
+
+        permissions:
+            contents: read
+            pull-requests: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Dependency Review
+              uses: actions/dependency-review-action@v4
+              with:
+                  fail-on-severity: moderate
+                  allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+                  deny-licenses: GPL-2.0, GPL-3.0

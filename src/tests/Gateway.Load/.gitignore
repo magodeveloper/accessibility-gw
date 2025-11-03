@@ -1,0 +1,33 @@
+# Gateway.Load - .gitignore
+# Ignorar archivos específicos de load tests
+
+# Environment files con información sensible
+.env
+.env.local
+.env.development
+.env.production
+.env.testing
+
+# Resultados de tests (pueden contener datos sensibles)
+results/*.json
+!results/.gitkeep
+
+# Logs de ejecución
+*.log
+logs/
+
+# Node modules (si se instalan dependencias de JS)
+node_modules/
+package-lock.json
+
+# Archivos temporales
+*.tmp
+*.temp
+.temp/
+
+# Reportes generados
+reports/
+*.html
+
+# Cache de K6
+.k6/

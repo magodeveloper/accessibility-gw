@@ -1,0 +1,282 @@
+{{ define "email.critical.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .alert-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .alert-box h2 {
+            margin: 0 0 10px 0;
+            color: #721c24;
+            font-size: 20px;
+        }
+        .alert-box p {
+            margin: 5px 0;
+            color: #856404;
+        }
+        .details {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details td {
+            padding: 8px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .details td:first-child {
+            font-weight: 600;
+            width: 120px;
+            color: #495057;
+        }
+        .description {
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .actions {
+            text-align: center;
+            padding: 20px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 5px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button-dashboard {
+            background-color: #17a2b8;
+        }
+        .button-dashboard:hover {
+            background-color: #117a8b;
+        }
+        .button-runbook {
+            background-color: #6c757d;
+        }
+        .button-runbook:hover {
+            background-color: #5a6268;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 12px;
+        }
+        .severity-critical {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">🚨</div>
+            <h1>CRITICAL ALERT</h1>
+            <p>Accessibility Platform Monitoring</p>
+        </div>
+        
+        <div class="content">
+            {{ range .Alerts }}
+            <div class="alert-box">
+                <h2>{{ .Labels.alertname }}</h2>
+                <p><strong>{{ .Annotations.summary }}</strong></p>
+            </div>
+            
+            <div class="details">
+                <table>
+                    <tr>
+                        <td>Severity:</td>
+                        <td><span class="severity-critical">{{ .Labels.severity | toUpper }}</span></td>
+                    </tr>
+                    <tr>
+                        <td>Service:</td>
+                        <td>{{ if .Labels.service }}{{ .Labels.service }}{{ else }}N/A{{ end }}</td>
+                    </tr>
+                    <tr>
+                        <td>Component:</td>
+                        <td>{{ if .Labels.component }}{{ .Labels.component }}{{ else }}N/A{{ end }}</td>
+                    </tr>
+                    <tr>
+                        <td>Team:</td>
+                        <td>{{ if .Labels.team }}{{ .Labels.team }}{{ else }}N/A{{ end }}</td>
+                    </tr>
+                    <tr>
+                        <td>Started At:</td>
+                        <td>{{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</td>
+                    </tr>
+                    {{ if .EndsAt }}
+                    <tr>
+                        <td>Ended At:</td>
+                        <td>{{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}</td>
+                    </tr>
+                    {{ end }}
+                </table>
+            </div>
+            
+            {{ if .Annotations.description }}
+            <div class="description">{{ .Annotations.description }}</div>
+            {{ end }}
+            
+            <div class="actions">
+                {{ if .Annotations.dashboard_url }}
+                <a href="{{ .Annotations.dashboard_url }}" class="button button-dashboard">📊 View Dashboard</a>
+                {{ end }}
+                
+                {{ if .Annotations.runbook_url }}
+                <a href="{{ .Annotations.runbook_url }}" class="button button-runbook">📖 View Runbook</a>
+                {{ end }}
+                
+                <a href="http://localhost:9093" class="button">🔕 Manage Alerts</a>
+            </div>
+            {{ end }}
+        </div>
+        
+        <div class="footer">
+            <p>This is an automated alert from Prometheus Alertmanager</p>
+            <p>Accessibility Platform Monitoring System</p>
+            <p>Generated at: {{ .ExternalURL }}</p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "email.warning.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .alert-item {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .alert-item h3 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
+            <h1>Warning Alerts</h1>
+            <p>{{ .Alerts | len }} alert(s) require attention</p>
+        </div>
+        
+        <div class="content">
+            {{ range .Alerts }}
+            <div class="alert-item">
+                <h3>{{ .Labels.alertname }}</h3>
+                <p>{{ .Annotations.summary }}</p>
+                <small>Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}</small>
+            </div>
+            {{ end }}
+        </div>
+        
+        <div class="footer">
+            <p>Accessibility Platform Monitoring System</p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
