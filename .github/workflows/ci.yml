@@ -119,8 +119,9 @@ jobs:
       - name: Run container
         run: |
           docker run -d --rm --name gateway-smoke \
-            -p 8100:8100 \
+            -p 8100:8080 \
             -e ASPNETCORE_ENVIRONMENT=Production \
+            -e ASPNETCORE_URLS="http://+:8080" \
             -e Redis__ConnectionString="172.17.0.1:6379" \
             -e JwtSettings__SecretKey="test-secret-key-for-ci-must-be-at-least-32-characters-long" \
             -e JwtSettings__Issuer="https://api.accessibility.company.com" \
@@ -129,6 +130,8 @@ jobs:
             -e Gate__Services__analysis="http://localhost:8082" \
             -e Gate__Services__reports="http://localhost:8083" \
             -e Gate__Services__middleware="http://localhost:3001" \
+            -e HealthChecksUI__HealthChecks__0__Name="Gateway API" \
+            -e HealthChecksUI__HealthChecks__0__Uri="http://localhost:8080/health" \
             "$IMAGE"
 
       - name: Wait for health
