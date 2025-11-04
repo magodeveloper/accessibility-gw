@@ -21,9 +21,9 @@ export const gatewayMetrics = {
     serviceDuration: new Trend('service_duration'),
     queueTime: new Trend('queue_time'),
 
-    // Gauges
-    activeConnections: new Gauge('active_connections'),
-    concurrentUsers: new Gauge('concurrent_users')
+    // Gauges (No usadas directamente - K6 provee vus y vus_max built-in)
+    // activeConnections: new Gauge('active_connections'),
+    // concurrentUsers: new Gauge('concurrent_users')
 };
 
 // Función para registrar métricas de request
@@ -63,14 +63,14 @@ export function recordRequestMetrics(response, service = 'gateway') {
     }
 }
 
-// Función para actualizar métricas de usuarios activos
+// Funciones deshabilitadas - K6 ya provee métricas vus y vus_max built-in
+// No es necesario trackear usuarios activos manualmente
 export function updateActiveUsers(count) {
-    gatewayMetrics.concurrentUsers.add(count);
+    // No-op: K6 ya trackea esto con 'vus' metric
 }
 
-// Función para registrar conexiones activas
 export function updateActiveConnections(count) {
-    gatewayMetrics.activeConnections.add(count);
+    // No-op: K6 ya trackea esto con 'vus' metric
 }
 
 // Función para obtener summary de métricas

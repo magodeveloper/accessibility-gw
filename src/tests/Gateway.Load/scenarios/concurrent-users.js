@@ -24,7 +24,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { config, endpoints, generateTestData, validateGatewayResponse, getThresholdsForLevel, getStagesForLevel } from '../utils/config.js';
-import { recordRequestMetrics, updateActiveUsers } from '../utils/metrics.js';
+import { recordRequestMetrics } from '../utils/metrics.js';
 import { generateTestUserToken, createAuthHeaders } from '../utils/jwt.js';
 import { executeHealthChecks, executeUserOperations, executeAnalysisOperations, executeReportOperations } from '../utils/scenarios-common.js';
 
@@ -123,8 +123,6 @@ export function setup() {
 
 // ===== FUNCIÓN PRINCIPAL DE TEST =====
 export default function concurrentUsersTest(data) {
-    updateActiveUsers(__VU);
-
     if (isSimpleMode) {
         executeSimpleMode(data);
     } else {
