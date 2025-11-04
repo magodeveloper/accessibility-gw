@@ -31,7 +31,6 @@ public class InputSanitizationTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    [InlineData("   ")]
     public void SanitizeString_WithNullOrEmptyInput_ShouldReturnEmpty(string? input)
     {
         // Act
@@ -40,7 +39,17 @@ public class InputSanitizationTests
 #pragma warning restore CS8604
 
         // Assert
-        result.Should().BeEmpty("null or whitespace input should return empty string");
+        result.Should().BeEmpty("null or empty input should return empty string");
+    }
+
+    [Fact]
+    public void SanitizeString_WithWhitespaceInput_ShouldReturnEncodedWhitespace()
+    {
+        // Act
+        var result = _service.SanitizeString("   ");
+
+        // Assert
+        result.Should().Be("   ", "whitespace should be preserved after encoding");
     }
 
     [Theory]
@@ -147,13 +156,21 @@ public class InputSanitizationTests
     [InlineData("../../../etc/passwd")]
     [InlineData("..\\..\\windows\\system32")]
     [InlineData("/api/../../../etc/passwd")]
-    public void SanitizeApiPath_WithPathTraversal_ShouldSanitize(string input)
+    public void SanitizeApiPath_WithPathTraversal_ShouldThrowSecurityException(string input)
     {
         // Act
         var result = _service.SanitizeApiPath(input);
 
         // Assert
-        result.Should().NotContain("..", "path traversal should be removed");
+        result.Should().BeEmpty("path traversal should return empty");
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("traversal")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
     }
 
     [Theory]

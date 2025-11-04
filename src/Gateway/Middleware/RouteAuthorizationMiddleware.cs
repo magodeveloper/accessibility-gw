@@ -30,6 +30,9 @@ public class RouteAuthorizationMiddleware
         var path = context.Request.Path.Value ?? string.Empty;
         var method = context.Request.Method;
 
+        _logger.LogInformation("=== RouteAuthorizationMiddleware === Processing {Method} {Path}", method, path);
+        _logger.LogInformation("=== AllowedRoutes count: {Count} ===", _options.AllowedRoutes?.Count ?? 0);
+
         // Rutas públicas del sistema (health, metrics, swagger)
         var systemPublicPaths = new[]
         {

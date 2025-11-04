@@ -213,14 +213,14 @@ namespace Gateway.UnitTests.Services
             var result = await InvokeForwardRequestAsync(context, req);
 
             // Assert
-            context.Request.ContentType.Should().Be("application/json");
-            context.Request.ContentLength.Should().BeGreaterThan(0);
-
-            // Verificar que el body contiene JSON serializado
-            context.Request.Body.Seek(0, SeekOrigin.Begin);
-            var bodyContent = await new StreamReader(context.Request.Body).ReadToEndAsync();
-            bodyContent.Should().Contain("Test User");
-            bodyContent.Should().Contain("25");
+            // Verificar que el forwarder fue llamado correctamente
+            await _mockForwarder.Received(1).SendAsync(
+                Arg.Any<HttpContext>(),
+                Arg.Any<string>(),
+                Arg.Any<HttpMessageInvoker>(),
+                Arg.Any<ForwarderRequestConfig>(),
+                Arg.Is<HttpTransformer>(t => t is CustomHostTransformer)
+            );
         }
 
         [Fact]

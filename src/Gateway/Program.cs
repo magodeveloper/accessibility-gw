@@ -4,6 +4,7 @@ using Gateway;
 using System.Net;
 using Gateway.Models;
 using Gateway.Services;
+using Gateway.Middleware;
 using System.Text.Json;
 using Polly.Extensions.Http;
 using System.Net.Http.Headers;
@@ -268,13 +269,17 @@ if (gateConfig?.Services != null)
 {
     foreach (var service in gateConfig.Services)
     {
-        healthChecksBuilder.AddCheck<ServiceHealthCheck>(
-            $"service-{service.Key}",
-            tags: new[] { "ready", service.Key });
-    }
-}
+        var serviceName = service.Key;
+        var serviceUrl = service.Value; // El Value es directamente el string de la URL
 
-// Health check para Redis si está configurado
+        // Registrar el health check usando AddTypeActivatedCheck con el constructor correcto
+        healthChecksBuilder.AddTypeActivatedCheck<ServiceHealthCheck>(
+            $"service-{serviceName}",
+            failureStatus: null,
+            tags: new[] { "ready", serviceName },
+            args: new object[] { serviceName, serviceUrl });
+    }
+}// Health check para Redis si está configurado
 if (!string.IsNullOrEmpty(redisConnectionString))
 {
     healthChecksBuilder.AddRedis(redisConnectionString, name: "redis", tags: new[] { "ready" });
@@ -377,7 +382,14 @@ app.UseCors("AllowedOrigins");
 if (!string.IsNullOrWhiteSpace(authority))
 {
     app.UseAuthentication();
+}
+
+app.UseMiddleware<RouteAuthorizationMiddleware>();
+
+if (!string.IsNullOrWhiteSpace(authority))
+{
     app.UseAuthorization();
+    app.UseMiddleware<JwtClaimsTransformMiddleware>();
 }
 
 app.UseRateLimiter();
@@ -584,7 +596,35 @@ app.MapPost("/api/v1/translate", async (
 .Produces<ProblemDetails>(StatusCodes.Status502BadGateway)
 .ProducesValidationProblem();
 
-// Endpoint directo para cada servicio (alternativo)
+// Endpoint directo para cada servicio - SIN path adicional
+app.MapMethods("/api/v1/services/{service}",
+    new[] { "GET", "POST", "PUT", "PATCH", "DELETE" },
+    async (string service, HttpContext context, RequestTranslator translator) =>
+{
+    var request = new TranslateRequest
+    {
+        Service = service,
+        Method = context.Request.Method,
+        Path = $"/api/{service}",
+        Query = context.Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString()),
+        Headers = context.Request.Headers
+            .Where(h => !h.Key.StartsWith(":"))
+            .ToDictionary(h => h.Key, h => h.Value.ToString())
+    };
+
+    if (!translator.IsAllowed(request))
+        return Results.Problem("Route not allowed", statusCode: StatusCodes.Status403Forbidden);
+
+    await translator.ForwardAsync(context, request, context.RequestAborted);
+    return Results.Empty;
+})
+.WithName("DirectServiceCallNoPath")
+.WithSummary("Llamada directa a servicio sin path")
+.WithDescription("Permite llamadas directas a servicios usando la ruta /api/v1/services/{service}")
+.WithTags("Gateway", "Direct")
+.RequireRateLimiting("public");
+
+// Endpoint directo para cada servicio - CON path adicional
 app.MapMethods("/api/v1/services/{service}/{**path}",
     new[] { "GET", "POST", "PUT", "PATCH", "DELETE" },
     async (string service, string path, HttpContext context, RequestTranslator translator) =>

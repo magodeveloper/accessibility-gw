@@ -118,7 +118,7 @@ namespace Gateway.IntegrationTests.Fixtures
                 ["Gate:AllowedRoutes:0:methods:2"] = "PUT",
                 ["Gate:AllowedRoutes:0:methods:3"] = "PATCH",
                 ["Gate:AllowedRoutes:0:methods:4"] = "DELETE",
-                ["Gate:AllowedRoutes:0:pathPrefix"] = "/api/v1/services/users",
+                ["Gate:AllowedRoutes:0:pathPrefix"] = "/api/users",
                 ["Gate:AllowedRoutes:0:requiresAuth"] = "false",
 
                 // Rutas de análisis
@@ -128,7 +128,7 @@ namespace Gateway.IntegrationTests.Fixtures
                 ["Gate:AllowedRoutes:1:methods:2"] = "PUT",
                 ["Gate:AllowedRoutes:1:methods:3"] = "PATCH",
                 ["Gate:AllowedRoutes:1:methods:4"] = "DELETE",
-                ["Gate:AllowedRoutes:1:pathPrefix"] = "/api/v1/services/analysis",
+                ["Gate:AllowedRoutes:1:pathPrefix"] = "/api/analysis",
                 ["Gate:AllowedRoutes:1:requiresAuth"] = "false",
 
                 // Rutas de reportes
@@ -138,7 +138,7 @@ namespace Gateway.IntegrationTests.Fixtures
                 ["Gate:AllowedRoutes:2:methods:2"] = "PUT",
                 ["Gate:AllowedRoutes:2:methods:3"] = "PATCH",
                 ["Gate:AllowedRoutes:2:methods:4"] = "DELETE",
-                ["Gate:AllowedRoutes:2:pathPrefix"] = "/api/v1/services/reports",
+                ["Gate:AllowedRoutes:2:pathPrefix"] = "/api/reports",
                 ["Gate:AllowedRoutes:2:requiresAuth"] = "false",
 
                 // Rutas de middleware
@@ -148,7 +148,7 @@ namespace Gateway.IntegrationTests.Fixtures
                 ["Gate:AllowedRoutes:3:methods:2"] = "PUT",
                 ["Gate:AllowedRoutes:3:methods:3"] = "PATCH",
                 ["Gate:AllowedRoutes:3:methods:4"] = "DELETE",
-                ["Gate:AllowedRoutes:3:pathPrefix"] = "/api/v1/services/middleware",
+                ["Gate:AllowedRoutes:3:pathPrefix"] = "/api/middleware",
                 ["Gate:AllowedRoutes:3:requiresAuth"] = "false",
 
                 // ============================================

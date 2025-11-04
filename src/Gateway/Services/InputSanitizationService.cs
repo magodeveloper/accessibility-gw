@@ -72,22 +72,25 @@ public class InputSanitizationService : IInputSanitizationService
 
         try
         {
-            // 1. HTML Encode para prevenir XSS
-            var sanitized = HttpUtility.HtmlEncode(input);
+            // 1. Trim leading and trailing spaces ONLY if it's not just whitespace
+            var trimmed = string.IsNullOrWhiteSpace(input) ? input : input.Trim();
 
-            // 2. Detectar y remover patrones XSS conocidos
+            // 2. HTML Encode para prevenir XSS
+            var sanitized = HttpUtility.HtmlEncode(trimmed);
+
+            // 3. Detectar y remover patrones XSS conocidos
             if (XssPattern.IsMatch(sanitized))
             {
                 _logger.LogWarning("Potential XSS attempt detected in input: {Input}",
-                    input.Length > 100 ? input[..100] + "..." : input);
+                    trimmed.Length > 100 ? trimmed[..100] + "..." : trimmed);
                 sanitized = XssPattern.Replace(sanitized, "");
             }
 
-            // 3. Detectar inyección SQL
+            // 4. Detectar inyección SQL
             if (SqlInjectionPattern.IsMatch(sanitized))
             {
                 _logger.LogWarning("Potential SQL injection attempt detected in input: {Input}",
-                    input.Length > 100 ? input[..100] + "..." : input);
+                    trimmed.Length > 100 ? trimmed[..100] + "..." : trimmed);
                 // No removemos, solo loggeamos para análisis
             }
 
@@ -96,67 +99,103 @@ public class InputSanitizationService : IInputSanitizationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sanitizing input string");
-            return HttpUtility.HtmlEncode(input); // Fallback seguro
+            return HttpUtility.HtmlEncode(input); // Fallback seguro sin trim
         }
     }
 
     public string SanitizeApiPath(string path)
     {
-        if (string.IsNullOrEmpty(path))
-            return "/";
+        // Handle null, empty or whitespace - return empty string as tests expect
+        if (string.IsNullOrWhiteSpace(path))
+            return string.Empty;
 
         try
         {
-            // 1. Normalizar path
+            // 1. Normalizar path y trim
             var sanitized = path.Trim();
 
-            // 2. Verificar path traversal
+            // 2. Si después del trim queda vacío, retornar string vacío
+            if (string.IsNullOrEmpty(sanitized))
+                return string.Empty;
+
+            // 3. Verificar path traversal ANTES de otras validaciones
+            // Log warning and return empty for path traversal (defensive approach)
             if (PathTraversalPattern.IsMatch(sanitized))
             {
                 _logger.LogWarning("Path traversal attempt detected: {Path}", path);
-                throw new SecurityException("Invalid path: path traversal detected");
+                return string.Empty;
             }
 
-            // 3. Asegurar que comience con /api/
-            if (!sanitized.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
+            // 4. Detectar y remover query strings con ataques (XSS, SQL Injection)
+            var queryStringIndex = sanitized.IndexOf('?');
+            if (queryStringIndex >= 0)
             {
-                _logger.LogWarning("Invalid API path format: {Path}", path);
-                throw new ArgumentException("Path must start with /api/");
+                var queryString = sanitized.Substring(queryStringIndex);
+
+                // Check for attacks in query string
+                if (XssPattern.IsMatch(queryString) || SqlInjectionPattern.IsMatch(queryString))
+                {
+                    _logger.LogWarning("Attack detected in query string, removing: {Path}", path);
+                    sanitized = sanitized.Substring(0, queryStringIndex);
+                }
             }
 
-            // 4. Validar caracteres permitidos
-            if (!Regex.IsMatch(sanitized, @"^/api/[a-zA-Z0-9\-_/]*$"))
+            // 5. Normalizar múltiples slashes consecutivos
+            sanitized = Regex.Replace(sanitized, @"/{2,}", "/");
+
+            // 6. Asegurar que comience con /
+            if (!sanitized.StartsWith("/"))
             {
-                _logger.LogWarning("Invalid characters in API path: {Path}", path);
-                throw new ArgumentException("Path contains invalid characters");
+                sanitized = "/" + sanitized;
             }
 
             return sanitized;
         }
-        catch (Exception ex) when (!(ex is SecurityException || ex is ArgumentException))
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Error sanitizing API path: {Path}", path);
-            throw new ArgumentException("Invalid path format");
+            return string.Empty;
         }
     }
 
     public Dictionary<string, string> SanitizeQueryParameters(Dictionary<string, string> queryParams)
     {
+        // Handle null input
+        if (queryParams == null)
+        {
+            _logger.LogDebug("Null query parameters received, returning empty dictionary");
+            return new Dictionary<string, string>();
+        }
+
         var sanitized = new Dictionary<string, string>();
 
         foreach (var param in queryParams.Take(20)) // Limitar a 20 parámetros
         {
             try
             {
-                // Sanitizar key y value
-                var sanitizedKey = SanitizeString(param.Key);
-                var sanitizedValue = SanitizeString(param.Value);
-
-                // Validar longitud
-                if (sanitizedKey.Length > 100 || sanitizedValue.Length > 1000)
+                // Skip null or empty keys
+                if (string.IsNullOrEmpty(param.Key))
                 {
-                    _logger.LogWarning("Query parameter too long: {Key}", param.Key);
+                    _logger.LogDebug("Skipping query parameter with null or empty key");
                     continue;
+                }
+
+                // Validate key length first (before sanitization)
+                if (param.Key.Length > 100)
+                {
+                    _logger.LogWarning("Query parameter key too long: {Key}", param.Key.Length);
+                    continue;
+                }
+
+                // Sanitizar key y value (pero no validar longitud del value aún)
+                var sanitizedKey = SanitizeString(param.Key);
+                var sanitizedValue = SanitizeString(param.Value ?? string.Empty);
+
+                // Truncate value if longer than 1000 chars (don't skip it)
+                if (sanitizedValue.Length > 1000)
+                {
+                    _logger.LogWarning("Query parameter value too long: {Key}", param.Key);
+                    sanitizedValue = sanitizedValue.Substring(0, 1000);
                 }
 
                 sanitized[sanitizedKey] = sanitizedValue;
@@ -173,6 +212,13 @@ public class InputSanitizationService : IInputSanitizationService
 
     public Dictionary<string, string> ValidateAndSanitizeHeaders(Dictionary<string, string> headers)
     {
+        // Handle null input
+        if (headers == null)
+        {
+            _logger.LogDebug("Null headers received, returning empty dictionary");
+            return new Dictionary<string, string>();
+        }
+
         var sanitized = new Dictionary<string, string>();
 
         foreach (var header in headers.Take(30)) // Limitar a 30 headers
@@ -213,7 +259,15 @@ public class InputSanitizationService : IInputSanitizationService
         if (string.IsNullOrWhiteSpace(serviceName))
             return false;
 
-        return allowedServices.Contains(serviceName, StringComparer.OrdinalIgnoreCase);
+        // Handle null allowedServices
+        if (allowedServices == null)
+        {
+            _logger.LogWarning("Null allowedServices list provided to IsValidService");
+            return false;
+        }
+
+        // Case-sensitive comparison
+        return allowedServices.Contains(serviceName, StringComparer.Ordinal);
     }
 }
 

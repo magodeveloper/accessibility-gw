@@ -240,9 +240,9 @@ namespace Gateway.UnitTests.Services
             // Test múltiples tipos de errores del forwarder
             var testCases = new[]
             {
-                new { Error = ForwarderError.Request, ExpectedStatus = 400 },
-                new { Error = ForwarderError.RequestTimedOut, ExpectedStatus = 504 },
-                new { Error = ForwarderError.NoAvailableDestinations, ExpectedStatus = 502 }
+                new { Error = ForwarderError.Request, ExpectedStatus = 502 }, // BadGateway - error de conexión al backend
+                new { Error = ForwarderError.RequestTimedOut, ExpectedStatus = 504 }, // GatewayTimeout
+                new { Error = ForwarderError.NoAvailableDestinations, ExpectedStatus = 503 } // ServiceUnavailable
             };
 
             foreach (var testCase in testCases)
@@ -403,7 +403,7 @@ namespace Gateway.UnitTests.Services
         #region Casos de Error y Manejo de Excepciones - Nuevos Tests para Cobertura
 
         [Fact]
-        public async Task ProcessRequestAsync_WithForwarderError_Request_ShouldReturnBadRequest()
+        public async Task ProcessRequestAsync_WithForwarderError_Request_ShouldReturnBadGateway()
         {
             // Arrange
             var req = new TranslateRequest { Service = "users", Method = "POST", Path = "/api/users" };
@@ -428,7 +428,7 @@ namespace Gateway.UnitTests.Services
             // Assert
             result.Should().NotBeNull();
             result.Error.Should().NotBeNull();
-            result.Error!.StatusCode.Should().Be(400); // BadRequest
+            result.Error!.StatusCode.Should().Be(502); // BadGateway - error de conexión al backend
             result.Error.Message.Should().Contain("Gateway forwarding error: Request");
         }
 
@@ -463,7 +463,7 @@ namespace Gateway.UnitTests.Services
         }
 
         [Fact]
-        public async Task ProcessRequestAsync_WithForwarderError_NoAvailableDestinations_ShouldReturnBadGateway()
+        public async Task ProcessRequestAsync_WithForwarderError_NoAvailableDestinations_ShouldReturnServiceUnavailable()
         {
             // Arrange
             var req = new TranslateRequest { Service = "users", Method = "POST", Path = "/api/users" };
@@ -488,7 +488,7 @@ namespace Gateway.UnitTests.Services
             // Assert
             result.Should().NotBeNull();
             result.Error.Should().NotBeNull();
-            result.Error!.StatusCode.Should().Be(502); // BadGateway
+            result.Error!.StatusCode.Should().Be(503); // ServiceUnavailable - sin destinos disponibles
             result.Error.Message.Should().Contain("Gateway forwarding error: NoAvailableDestinations");
         }
 
@@ -564,7 +564,7 @@ namespace Gateway.UnitTests.Services
             await _translator.ForwardAsync(context, req, CancellationToken.None);
 
             // Assert
-            context.Response.StatusCode.Should().Be(400);
+            context.Response.StatusCode.Should().Be(502); // BadGateway - error de conexión al backend
             context.Response.ContentType.Should().Be("application/json");
         }
 
@@ -588,11 +588,11 @@ namespace Gateway.UnitTests.Services
             await _translator.ForwardAsync(context, req, CancellationToken.None);
 
             // Assert
-            context.Response.StatusCode.Should().Be(400);
+            context.Response.StatusCode.Should().Be(502); // BadGateway - error de conexión al backend
             _mockMetricsService.Received(1).RecordRequest(
                 req.Service,
                 req.Method,
-                400,
+                502,
                 Arg.Any<double>());
         }
 

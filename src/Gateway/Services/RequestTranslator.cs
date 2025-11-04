@@ -273,6 +273,12 @@ public sealed class RequestTranslator
                 bodyString = JsonSerializer.Serialize(req.Body, _json);
             }
             Console.WriteLine($"=== BODY PREPARED FOR TRANSFORMER === Length: {bodyString.Length}");
+
+            // Establecer Content-Type y Content-Length en el HttpContext.Request
+            context.Request.ContentType = "application/json";
+            var bodyBytes = Encoding.UTF8.GetBytes(bodyString);
+            context.Request.ContentLength = bodyBytes.Length;
+            context.Request.Body = new MemoryStream(bodyBytes);
         }
 
         var transformer = new CustomHostTransformer(actualExpectedHost, targetUri.ToString(), bodyString);
@@ -330,9 +336,9 @@ public sealed class RequestTranslator
         {
             var status = error switch
             {
-                ForwarderError.Request => HttpStatusCode.BadRequest,
+                ForwarderError.Request => HttpStatusCode.BadGateway, // Error de conexión al backend
                 ForwarderError.RequestTimedOut => HttpStatusCode.GatewayTimeout,
-                ForwarderError.NoAvailableDestinations => HttpStatusCode.BadGateway,
+                ForwarderError.NoAvailableDestinations => HttpStatusCode.ServiceUnavailable,
                 _ => HttpStatusCode.BadGateway
             };
 

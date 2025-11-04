@@ -54,7 +54,11 @@ public class RateLimitingTests : IClassFixture<TestWebApplicationFactory>
         // Assert - Los endpoints públicos deberían ser accesibles
         healthResponse.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable);
         metricsResponse.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
-        apiResponse.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
+        apiResponse.StatusCode.Should().BeOneOf(
+            HttpStatusCode.OK,
+            HttpStatusCode.NotFound,
+            HttpStatusCode.BadGateway,
+            HttpStatusCode.ServiceUnavailable);
     }
 
     [Theory]
@@ -197,6 +201,7 @@ public class RateLimitingTests : IClassFixture<TestWebApplicationFactory>
         usersResponse.StatusCode.Should().BeOneOf(
             HttpStatusCode.OK,
             HttpStatusCode.ServiceUnavailable,
+            HttpStatusCode.BadGateway,
             HttpStatusCode.NotFound);
     }
 

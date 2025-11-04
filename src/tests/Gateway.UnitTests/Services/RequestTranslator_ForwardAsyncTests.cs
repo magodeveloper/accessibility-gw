@@ -92,7 +92,7 @@ namespace Gateway.UnitTests.Services
             var responseBody = await new StreamReader(context.Response.Body).ReadToEndAsync();
 
             // Assert
-            context.Response.StatusCode.Should().Be(400); // BadRequest por ForwarderError.Request
+            context.Response.StatusCode.Should().Be(502); // BadGateway - error de conexión al backend
             responseBody.Should().Contain("error");
         }
 

@@ -71,7 +71,7 @@ namespace Gateway.UnitTests.Services
             // Assert
             result.Error.Should().NotBeNull();
             result.Error!.Message.Should().Contain("Gateway forwarding error");
-            result.Error.StatusCode.Should().Be(400); // BadRequest por ForwarderError.Request
+            result.Error.StatusCode.Should().Be(502); // BadGateway - error de conexión al backend
         }
 
         [Fact]

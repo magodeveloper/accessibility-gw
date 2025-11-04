@@ -70,8 +70,7 @@ namespace Gateway.UnitTests.Services
                 _mockCacheService,
                 _mockMetricsService,
                 _mockResiliencePolicyService,
-                _mockLogger,
-                Substitute.For<IHostEnvironment>()
+                _mockLogger
             );
         }
 

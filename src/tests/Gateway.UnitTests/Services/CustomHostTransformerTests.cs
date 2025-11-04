@@ -17,20 +17,13 @@ namespace Gateway.UnitTests.Services;
 /// </summary>
 public class CustomHostTransformerTests
 {
-    private static IHostEnvironment CreateTestEnvironment()
-    {
-        var mock = new Mock<IHostEnvironment>();
-        mock.Setup(e => e.EnvironmentName).Returns("Test");
-        return mock.Object;
-    }
-
     [Fact]
     public async Task TransformRequestAsync_WithValidParameters_ShouldSetHostHeader()
     {
         // Arrange
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, null, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, null);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://localhost/api");
@@ -49,7 +42,7 @@ public class CustomHostTransformerTests
         // Arrange
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users/123";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, null, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, null);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://localhost/api");
@@ -70,7 +63,7 @@ public class CustomHostTransformerTests
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users";
         var requestBody = "{\"name\":\"John\",\"age\":30}";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Post, "https://localhost/api");
@@ -92,7 +85,7 @@ public class CustomHostTransformerTests
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users/123";
         var requestBody = "{\"name\":\"Jane\",\"age\":25}";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Put, "https://localhost/api");
@@ -114,7 +107,7 @@ public class CustomHostTransformerTests
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users/123";
         var requestBody = "{\"age\":26}";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Patch, "https://localhost/api");
@@ -136,7 +129,7 @@ public class CustomHostTransformerTests
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users";
         var requestBody = "{\"filter\":\"active\"}";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://localhost/api");
@@ -157,7 +150,7 @@ public class CustomHostTransformerTests
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users/123";
         var requestBody = "{\"reason\":\"test\"}";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Delete, "https://localhost/api");
@@ -177,7 +170,7 @@ public class CustomHostTransformerTests
         // Arrange
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, null, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, null);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Post, "https://localhost/api");
@@ -196,7 +189,7 @@ public class CustomHostTransformerTests
         // Arrange
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, "", CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, "");
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Post, "https://localhost/api");
@@ -215,7 +208,7 @@ public class CustomHostTransformerTests
         // Arrange
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, "   ", CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, "   ");
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Post, "https://localhost/api");
@@ -239,7 +232,7 @@ public class CustomHostTransformerTests
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/data";
         var largeBody = new string('x', 10000);
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, largeBody, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, largeBody);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Post, "https://localhost/api");
@@ -261,7 +254,7 @@ public class CustomHostTransformerTests
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users";
         var jsonBody = @"{""user"":{""name"":""Test"",""email"":""test@example.com"",""roles"":[""admin"",""user""]}}";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, jsonBody, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, jsonBody);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Post, "https://localhost/api");
@@ -282,7 +275,7 @@ public class CustomHostTransformerTests
         // Arrange
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, null, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, null);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://localhost/api");
@@ -303,7 +296,7 @@ public class CustomHostTransformerTests
     public async Task TransformRequestAsync_WithDifferentHostsAndUris_ShouldSetCorrectly(string host, string uri)
     {
         // Arrange
-        var transformer = new CustomHostTransformer(host, uri, null, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(host, uri, null);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://localhost/api");
@@ -323,7 +316,7 @@ public class CustomHostTransformerTests
         // Arrange
         var expectedHost = "api-test.example-domain.com";
         var targetUri = "https://api-test.example-domain.com/users";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, null, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, null);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://localhost/api");
@@ -342,7 +335,7 @@ public class CustomHostTransformerTests
         // Arrange
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/users?page=1&size=10";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, null, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, null);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://localhost/api");
@@ -362,7 +355,7 @@ public class CustomHostTransformerTests
         // Arrange
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/docs#section1";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, null, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, null);
 
         var httpContext = new DefaultHttpContext();
         var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://localhost/api");
@@ -385,7 +378,7 @@ public class CustomHostTransformerTests
         var expectedHost = "api.example.com";
         var targetUri = "https://api.example.com/test";
         var requestBody = "{\"test\":\"data\"}";
-        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody, CreateTestEnvironment());
+        var transformer = new CustomHostTransformer(expectedHost, targetUri, requestBody);
 
         var httpContext = new DefaultHttpContext();
         var httpMethod = new HttpMethod(methodName);

@@ -17,50 +17,18 @@
     Acción a ejecutar:
     - smoke: Prueba básica de funcionalidad
     - load: Prueba de carga normal
-       # Verificar instalación de k6 (excepto para help)
-    if ($Action -ne "help" -and -not (Test-K6Installation)) {
-        if ($Action -eq "install") {
-            if (-not (Install-K6)) {
-                exit 1
-            }
-        }
-        else {
-            Write-ColoredOutput "❌ k6 is required. Run with -Action install to install it." "Error"
-            exit 1
-        }
-    }
-    
-    # Verificar salud del servicio (excepto para install, clean, test-verbose y help)
-    if ($Action -notin @("install", "clean", "clean-all", "report", "test-verbose", "help")) {
-        if (-not (Test-ServiceHealth -Url $BaseUrl)) {
-            Write-ColoredOutput "❌ Service is not healthy. Please check the Gateway is running." "Error"
-            exit 1
-        }
-    }el servicio (excepto para install, clean, test-verbose y help)
-    if ($Action -notin @("install", "clean", "clean-all", "report", "test-verbose", "help")) {
-        if (-not (Test-ServiceHealth -Url $BaseUrl)) {
-            Write-ColoredOutput "❌ Service is not healthy. Please check the Gateway is running." "Error"
-            exit 1
-        }
-    }
-    
-    # Ejecutar acción solicitada
-    switch ($Action) {
-        "help" {
-            Show-Help
-        }
-        
-        "install" {
-            Write-ColoredOutput "✅ k6 installation completed" "Success"
-        } Prueba de estrés
+    - stress: Prueba de estrés
     - spike: Prueba de picos de carga
     - endurance: Prueba de resistencia (~40 min)
     - all: Ejecutar todas las pruebas
     - install: Instalar k6
-    - report: Generar reporte de resultados
     - clean: Limpiar resultados antiguos de load tests
     - clean-all: Limpiar todos los TestResults del proyecto
     - test-verbose: Ejecutar script de prueba con verbose
+    - setup-full: Levantar entorno completo
+    - teardown: Detener y limpiar entorno
+    - run-all: Ejecutar todas las pruebas con escenario genérico
+    - help: Mostrar ayuda
 
 .PARAMETER BaseUrl
     URL base del Gateway a probar (default: http://localhost:5000)
@@ -77,9 +45,6 @@
 .PARAMETER VerboseOutput
     Activar salida detallada
 
-.PARAMETER GenerateReport
-    Generar reporte después de ejecutar tests
-
 .PARAMETER SkipHealthCheck
     Omitir verificación de health del servicio
 
@@ -92,21 +57,30 @@
 .EXAMPLES
     .\manage-load-tests.ps1 smoke
     .\manage-load-tests.ps1 load -VerboseOutput
-    .\manage-load-tests.ps1 all -GenerateReport
+    .\manage-load-tests.ps1 all
     .\manage-load-tests.ps1 clean -DaysOld 3
     .\manage-load-tests.ps1 clean-all -DaysOld 1 -WhatIf
     .\manage-load-tests.ps1 test-verbose -VerboseOutput
     .\manage-load-tests.ps1 install
+    .\manage-load-tests.ps1 setup-full -IncludeMonitoring
+    .\manage-load-tests.ps1 teardown -RemoveVolumes
 
 .NOTES
+    This script only generates JSON results from k6 tests.
+    To view the complete dashboard with all metrics, run from project root:
+    .\manage-tests.ps1 full -OpenDashboard
+    
     Versión unificada que reemplaza:
     - clean-test-results.ps1 (funcionalidad incluida en clean-all)
     - test-script.ps1 (funcionalidad incluida en test-verbose)
+    - setup-full-environment.ps1 (funcionalidad incluida en setup-full)
+    - teardown-environment.ps1 (funcionalidad incluida en teardown)
+    - run-all-load-tests.ps1 (funcionalidad incluida en run-all)
 #>
 
 param(
     [Parameter(Mandatory = $false)]
-    [ValidateSet("smoke", "load", "stress", "spike", "endurance", "all", "install", "report", "clean", "clean-all", "test-verbose", "dashboard", "setup-full", "teardown", "run-all", "help")]
+    [ValidateSet("smoke", "load", "stress", "spike", "endurance", "all", "install", "clean", "clean-all", "test-verbose", "setup-full", "teardown", "run-all", "help")]
     [string]$Action = "smoke",
     
     [Parameter(Mandatory = $false)]
@@ -123,9 +97,6 @@ param(
     
     [Parameter(Mandatory = $false)]
     [switch]$VerboseOutput,
-    
-    [Parameter(Mandatory = $false)]
-    [switch]$GenerateReport,
     
     [Parameter(Mandatory = $false)]
     [switch]$SkipHealthCheck,
@@ -443,92 +414,6 @@ function Invoke-AllTests {
     }
     
     return $results
-}
-
-function New-TestReport {
-    Write-ColoredOutput "📊 Generating test report..." "Info"
-    
-    $resultFiles = Get-ChildItem -Path $ResultsDir -Filter "*-results-*.json" | Sort-Object LastWriteTime -Descending
-    
-    if ($resultFiles.Count -eq 0) {
-        Write-ColoredOutput "❌ No result files found in $ResultsDir" "Error"
-        return
-    }
-    
-    $reportFile = Join-Path $ResultsDir "load-test-report-$(Get-Date -Format 'yyyyMMdd-HHmmss').html"
-    
-    $htmlContent = @"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Load Test Report - Accessibility Gateway</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { color: #2E86AB; border-bottom: 2px solid #2E86AB; padding-bottom: 10px; }
-        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-        .success { background-color: #d4edda; border-color: #c3e6cb; }
-        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
-        .error { background-color: #f8d7da; border-color: #f5c6cb; }
-        .metric { display: inline-block; margin: 10px; padding: 10px; background: #f8f9fa; border-radius: 3px; }
-        .timestamp { color: #666; font-size: 0.9em; }
-    </style>
-</head>
-<body>
-    <h1 class="header">🚀 Accessibility Gateway Load Test Report</h1>
-    <p class="timestamp">Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>
-    
-    <h2>📋 Test Summary</h2>
-    <div class="test-section">
-        <p><strong>Base URL:</strong> $BaseUrl</p>
-        <p><strong>Test Results:</strong> $($resultFiles.Count) files found</p>
-        <p><strong>Latest Test:</strong> $($resultFiles[0].LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))</p>
-    </div>
-    
-    <h2>📊 Recent Test Results</h2>
-"@
-
-    foreach ($file in $resultFiles | Select-Object -First 5) {
-        $testName = $file.Name -replace '-results-.*\.json$', ''
-        $htmlContent += @"
-    <div class="test-section">
-        <h3>$testName Test</h3>
-        <p><strong>File:</strong> $($file.Name)</p>
-        <p><strong>Time:</strong> $($file.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))</p>
-        <p><strong>Size:</strong> $([math]::Round($file.Length / 1KB, 2)) KB</p>
-    </div>
-"@
-    }
-    
-    $htmlContent += @"
-    
-    <h2>💡 Recommendations</h2>
-    <div class="test-section">
-        <ul>
-            <li>Run smoke tests before each deployment</li>
-            <li>Schedule load tests during low-traffic periods</li>
-            <li>Monitor error rates and response times</li>
-            <li>Set up alerting for SLA violations</li>
-        </ul>
-    </div>
-    
-    <footer style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; color: #666;">
-        <p>Generated by Accessibility Gateway Load Test Suite</p>
-    </footer>
-</body>
-</html>
-"@
-    
-    Set-Content -Path $reportFile -Value $htmlContent -Encoding UTF8
-    Write-ColoredOutput "✅ Report generated: $reportFile" "Success"
-    
-    # Intentar abrir el reporte
-    try {
-        Start-Process $reportFile
-        Write-ColoredOutput "🌐 Report opened in default browser" "Info"
-    }
-    catch {
-        Write-ColoredOutput "📄 Report saved to: $reportFile" "Info"
-    }
 }
 
 function Remove-OldResults {
@@ -1064,11 +949,9 @@ function Show-Help {
         @{Name = "endurance"; Description = "Long-running endurance test (~40 min)" }
         @{Name = "all"; Description = "Run all load tests sequentially" }
         @{Name = "install"; Description = "Install k6 load testing tool" }
-        @{Name = "report"; Description = "Generate consolidated test report" }
         @{Name = "clean"; Description = "Clean old load test results" }
         @{Name = "clean-all"; Description = "Clean all TestResults in project" }
         @{Name = "test-verbose"; Description = "Run verbose test script (replaces test-script.ps1)" }
-        @{Name = "dashboard"; Description = "Generate HTML dashboard with test results" }
         @{Name = "setup-full"; Description = "✨ Setup full environment (Gateway + microservices)" }
         @{Name = "teardown"; Description = "✨ Teardown environment and cleanup" }
         @{Name = "run-all"; Description = "✨ Run all tests using generic scenario" }
@@ -1082,11 +965,10 @@ function Show-Help {
     Write-ColoredOutput "`n🛠️  Common Usage Examples:" "Warning"
     Write-ColoredOutput "  .\manage-load-tests.ps1 smoke" "Success"
     Write-ColoredOutput "  .\manage-load-tests.ps1 load -VerboseOutput" "Success"
-    Write-ColoredOutput "  .\manage-load-tests.ps1 all -GenerateReport" "Success"
+    Write-ColoredOutput "  .\manage-load-tests.ps1 all" "Success"
     Write-ColoredOutput "  .\manage-load-tests.ps1 clean -DaysOld 3" "Success"
     Write-ColoredOutput "  .\manage-load-tests.ps1 clean-all -WhatIf" "Success"
     Write-ColoredOutput "  .\manage-load-tests.ps1 test-verbose -VerboseOutput" "Success"
-    Write-ColoredOutput "  .\manage-load-tests.ps1 dashboard" "Success"
     
     Write-ColoredOutput "`n✨ New Environment Management (Phase 4):" "Warning"
     Write-ColoredOutput "  .\manage-load-tests.ps1 setup-full" "Success"
@@ -1096,6 +978,12 @@ function Show-Help {
     Write-ColoredOutput "  .\manage-load-tests.ps1 teardown" "Success"
     Write-ColoredOutput "  .\manage-load-tests.ps1 teardown -RemoveVolumes -RemoveImages" "Success"
     
+    Write-ColoredOutput "`n📊 To View Dashboard with K6 Results:" "Warning"
+    Write-ColoredOutput "  Execute from project root:" "Info"
+    Write-ColoredOutput "  cd ..\..\.." "Info"
+    Write-ColoredOutput "  .\manage-tests.ps1 full -OpenDashboard" "Success"
+    Write-ColoredOutput "  (Dashboard integrates unit tests + coverage + K6 load tests)" "Info"
+    
     Write-ColoredOutput "`n📁 Replaced Scripts:" "Warning"
     Write-ColoredOutput "  • clean-test-results.ps1 → clean-all action" "Info"
     Write-ColoredOutput "  • test-script.ps1 → test-verbose action" "Info"
@@ -1103,12 +991,16 @@ function Show-Help {
     Write-ColoredOutput "  • teardown-environment.ps1 → teardown action (✨ NEW)" "Info"
     Write-ColoredOutput "  • run-all-load-tests.ps1 → run-all action (✨ NEW)" "Info"
     
+    Write-ColoredOutput "`n📊 Dashboard Generation:" "Warning"
+    Write-ColoredOutput "  • This script generates JSON results only" "Info"
+    Write-ColoredOutput "  • Use .\manage-tests.ps1 full -OpenDashboard for visual dashboard" "Info"
+    Write-ColoredOutput "  • Dashboard integrates: Unit Tests + Coverage + K6 Load Tests" "Info"
+    
     Write-ColoredOutput "`n🔧 Additional Parameters:" "Warning"
     Write-ColoredOutput "  -BaseUrl          : Target URL (default: http://localhost:5000)" "Info"
     Write-ColoredOutput "  -DaysOld          : Age threshold for cleanup (default: 7)" "Info"
     Write-ColoredOutput "  -WhatIf           : Preview what would be deleted (clean-all only)" "Info"
     Write-ColoredOutput "  -VerboseOutput    : Enable detailed logging" "Info"
-    Write-ColoredOutput "  -GenerateReport   : Create report after tests" "Info"
     Write-ColoredOutput "  -SkipHealthCheck  : Skip service health verification" "Info"
     Write-ColoredOutput "  -Mode             : Setup mode: docker/local/hybrid (setup-full)" "Info"
     Write-ColoredOutput "  -IncludeMonitoring: Start monitoring stack (setup-full)" "Info"
@@ -1116,46 +1008,6 @@ function Show-Help {
     Write-ColoredOutput "  -RemoveImages     : Remove Docker images (teardown)" "Info"
     Write-ColoredOutput "  -IncludeExtreme   : Include 500 users test (run-all)" "Info"
     Write-ColoredOutput "  -SimpleOnly       : Run only simple scenarios (run-all)" "Info"
-}
-
-function Invoke-DashboardGeneration {
-    Write-ColoredOutput "📊 Generating HTML Test Dashboard..." "Info"
-    
-    try {
-        # Navegar al directorio principal del proyecto
-        $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ScriptDir))
-        Set-Location $projectRoot
-        
-        # Verificar si existe el script de dashboard
-        $dashboardScript = Join-Path $projectRoot "manage-tests.ps1"
-        
-        if (-not (Test-Path $dashboardScript)) {
-            Write-ColoredOutput "❌ Dashboard script not found at: $dashboardScript" "Error"
-            return $false
-        }
-        
-        Write-ColoredOutput "🚀 Executing dashboard generator..." "Info"
-        
-        # Ejecutar el script de dashboard con tests y apertura automática
-        & $dashboardScript -RunTests -RunLoadTests -OpenDashboard
-        
-        if ($LASTEXITCODE -eq 0) {
-            Write-ColoredOutput "✅ Dashboard generated successfully!" "Success"
-            return $true
-        }
-        else {
-            Write-ColoredOutput "❌ Dashboard generation failed with exit code: $LASTEXITCODE" "Error"
-            return $false
-        }
-    }
-    catch {
-        Write-ColoredOutput "❌ Error generating dashboard: $($_.Exception.Message)" "Error"
-        return $false
-    }
-    finally {
-        # Regresar al directorio original
-        Set-Location $ScriptDir
-    }
 }
 
 function Test-VerboseScript {
@@ -1202,8 +1054,8 @@ try {
         }
     }
     
-    # Verificar salud del servicio (excepto para install, clean, test-verbose, dashboard, setup-full, teardown y help)
-    if ($Action -notin @("install", "clean", "clean-all", "report", "test-verbose", "dashboard", "setup-full", "teardown", "help")) {
+    # Verificar salud del servicio (excepto para install, clean, test-verbose, setup-full, teardown y help)
+    if ($Action -notin @("install", "clean", "clean-all", "test-verbose", "setup-full", "teardown", "help")) {
         if (-not (Test-ServiceHealth -Url $BaseUrl)) {
             Write-ColoredOutput "❌ Service is not healthy. Please check the Gateway is running." "Error"
             exit 1
@@ -1254,10 +1106,6 @@ try {
             if ($failed.Count -gt 0) { exit 1 }
         }
         
-        "report" {
-            New-TestReport
-        }
-        
         "clean" {
             Remove-OldResults -DaysOld $DaysOld
         }
@@ -1268,10 +1116,6 @@ try {
         
         "test-verbose" {
             Test-VerboseScript
-        }
-        
-        "dashboard" {
-            Invoke-DashboardGeneration
         }
         
         "setup-full" {
@@ -1295,12 +1139,8 @@ try {
         }
     }
     
-    # Generar reporte si se solicita
-    if ($GenerateReport -and $Action -ne "report") {
-        New-TestReport
-    }
-    
     Write-ColoredOutput "`n🎉 Load test operation completed successfully!" "Success"
+    Write-ColoredOutput "📊 To view results in dashboard, run: .\manage-tests.ps1 full -OpenDashboard (from project root)" "Info"
 }
 catch {
     Write-ColoredOutput "❌ Fatal error: $($_.Exception.Message)" "Error"

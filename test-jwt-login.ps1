@@ -11,86 +11,82 @@
 
 $ErrorActionPreference = "Continue"
 $baseUrl = "http://localhost:8100"
-$usersUrl = "http://localhost:8081"
 
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "   TEST FLUJO COMPLETO JWT AUTHENTICATION" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
-
-# Test 1: Crear usuario de prueba
-Write-Host "[TEST 1] Creando usuario de prueba..." -ForegroundColor Yellow
-$timestamp = Get-Date -Format "yyyyMMddHHmmss"
-$testEmail = "testuser_$timestamp@accessibility.com"
-$testPassword = "TestPass123!"
-
-$createUserBody = @{
-    name = "Test User $timestamp"
-    email = $testEmail
-    password = $testPassword
-    role = "user"
-} | ConvertTo-Json
-
-Write-Host "Email: $testEmail" -ForegroundColor White
-$createResponse = curl -X POST "$usersUrl/api/users" `
-    -H "Content-Type: application/json" `
-    -d $createUserBody `
-    -s 2>&1
-
-if ($createResponse -match "error|Error") {
-    Write-Host "❌ Error creando usuario: $createResponse" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "⚠️  Intentando con usuario existente..." -ForegroundColor Yellow
-    $testEmail = "admin@accessibility.com"
-    $testPassword = "Admin123!"
-} else {
-    Write-Host "✅ Usuario creado exitosamente" -ForegroundColor Green
-    Write-Host "Response: $createResponse" -ForegroundColor DarkGray
-}
+Write-Host "⚠️  NOTA IMPORTANTE:" -ForegroundColor Yellow
+Write-Host "Este test requiere un usuario válido en la base de datos." -ForegroundColor White
+Write-Host "El microservicio usa BCrypt para hashear passwords." -ForegroundColor White
+Write-Host ""
+Write-Host "Para crear un usuario de prueba, ejecuta desde el microservicio:" -ForegroundColor Cyan
+Write-Host "  cd c:\Git\accessibility-ms-users" -ForegroundColor Gray
+Write-Host "  # Usar endpoint de registro o seed data con BCrypt hash" -ForegroundColor Gray
 Write-Host ""
 
-# Test 2: Obtener token JWT mediante login
-Write-Host "[TEST 2] Obteniendo token JWT mediante login..." -ForegroundColor Yellow
+# Usar usuario de prueba predefinido
+Write-Host "[SETUP] Intentando login con usuario de prueba..." -ForegroundColor Yellow
+$testEmail = "testjwt@test.com"
+$testPassword = "Test123!"
+Write-Host "Email: $testEmail" -ForegroundColor White
+Write-Host "Password: $testPassword" -ForegroundColor White
+Write-Host ""
+
+# Test 1: Obtener token JWT mediante login
+Write-Host "[TEST 1] Obteniendo token JWT mediante login..." -ForegroundColor Yellow
 $loginBody = @{
-    email = $testEmail
+    email    = $testEmail
     password = $testPassword
-} | ConvertTo-Json
+}
 
-$loginResponse = curl -X POST "$baseUrl/api/Auth/login" `
-    -H "Content-Type: application/json" `
-    -d $loginBody `
-    -s 2>&1
-
-Write-Host "Response: $loginResponse" -ForegroundColor White
-
-if ($loginResponse -match '"token"' -or $loginResponse -match '"accessToken"') {
+try {
+    $loginResponse = Invoke-RestMethod -Uri "$baseUrl/api/Auth/login" `
+        -Method POST `
+        -Headers @{"Content-Type" = "application/json" } `
+        -Body ($loginBody | ConvertTo-Json) `
+        -ErrorAction Stop
+    
     Write-Host "✅ Login exitoso - Token JWT obtenido" -ForegroundColor Green
     
-    # Extraer el token del JSON response
-    $tokenMatch = $loginResponse | Select-String -Pattern '"(?:token|accessToken)"\s*:\s*"([^"]+)"'
-    if ($tokenMatch) {
-        $jwtToken = $tokenMatch.Matches.Groups[1].Value
+    if ($loginResponse.token) {
+        $jwtToken = $loginResponse.token
         Write-Host "Token (primeros 50 chars): $($jwtToken.Substring(0, [Math]::Min(50, $jwtToken.Length)))..." -ForegroundColor DarkGray
-    } else {
-        Write-Host "⚠️  Token obtenido pero no pudo extraerse del JSON" -ForegroundColor Yellow
+    }
+    elseif ($loginResponse.accessToken) {
+        $jwtToken = $loginResponse.accessToken
+        Write-Host "Token (primeros 50 chars): $($jwtToken.Substring(0, [Math]::Min(50, $jwtToken.Length)))..." -ForegroundColor DarkGray
+    }
+    else {
+        Write-Host "⚠️  Token obtenido pero formato desconocido" -ForegroundColor Yellow
+        Write-Host "Response: $($loginResponse | ConvertTo-Json -Compress)" -ForegroundColor White
         $jwtToken = $null
     }
-} else {
-    Write-Host "❌ Login falló: $loginResponse" -ForegroundColor Red
+}
+catch {
+    Write-Host "❌ Login falló" -ForegroundColor Red
+    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+    
+    if ($_.ErrorDetails.Message -match "BCrypt|Invalid salt") {
+        Write-Host ""
+        Write-Host "💡 El usuario existe pero tiene un hash de password inválido." -ForegroundColor Yellow
+        Write-Host "   El microservicio usa BCrypt. Crea el usuario desde el microservicio." -ForegroundColor Yellow
+    }
+    
     $jwtToken = $null
 }
 Write-Host ""
 
-# Test 3: Probar acceso a ruta protegida CON token
+# Test 2: Probar acceso a ruta protegida CON token
 if ($jwtToken) {
-    Write-Host "[TEST 3] Probando acceso a ruta protegida CON token..." -ForegroundColor Yellow
+    Write-Host "[TEST 2] Probando acceso a ruta protegida CON token..." -ForegroundColor Yellow
     
     $protectedResponse = curl -X GET "$baseUrl/api/users" `
         -H "Authorization: Bearer $jwtToken" `
         -s -w "`n%{http_code}" 2>&1
     
     $httpCode = $protectedResponse[-1]
-    $body = $protectedResponse[0..($protectedResponse.Length-2)] -join "`n"
+    $body = $protectedResponse[0..($protectedResponse.Length - 2)] -join "`n"
     
     Write-Host "GET /api/users con token JWT" -ForegroundColor White
     Write-Host "HTTP Status: $httpCode" -ForegroundColor White
@@ -98,18 +94,21 @@ if ($jwtToken) {
     if ($httpCode -eq "200") {
         Write-Host "✅ Acceso permitido con token válido" -ForegroundColor Green
         Write-Host "Response (primeros 200 chars): $($body.Substring(0, [Math]::Min(200, $body.Length)))..." -ForegroundColor DarkGray
-    } elseif ($httpCode -eq "401") {
+    }
+    elseif ($httpCode -eq "401") {
         Write-Host "❌ Token rechazado (401) - posible problema de validación" -ForegroundColor Red
-    } else {
+    }
+    else {
         Write-Host "⚠️  Respuesta inesperada: $httpCode" -ForegroundColor Yellow
     }
-} else {
-    Write-Host "[TEST 3] ⏭️  Saltado - No hay token disponible" -ForegroundColor Gray
+}
+else {
+    Write-Host "[TEST 2] ⏭️  Saltado - No hay token disponible" -ForegroundColor Gray
 }
 Write-Host ""
 
-# Test 4: Probar acceso a ruta protegida SIN token
-Write-Host "[TEST 4] Probando acceso a ruta protegida SIN token..." -ForegroundColor Yellow
+# Test 3: Probar acceso a ruta protegida SIN token
+Write-Host "[TEST 3] Probando acceso a ruta protegida SIN token..." -ForegroundColor Yellow
 
 $noTokenResponse = curl -X GET "$baseUrl/api/users" `
     -s -w "`n%{http_code}" 2>&1
@@ -121,13 +120,14 @@ Write-Host "HTTP Status: $httpCode" -ForegroundColor White
 
 if ($httpCode -eq "401") {
     Write-Host "✅ Correctamente rechazado sin token (401 Unauthorized)" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "❌ FALLO: Ruta protegida accesible sin token (HTTP $httpCode)" -ForegroundColor Red
 }
 Write-Host ""
 
-# Test 5: Probar token inválido
-Write-Host "[TEST 5] Verificando validación de tokens inválidos..." -ForegroundColor Yellow
+# Test 4: Probar token inválido
+Write-Host "[TEST 4] Verificando validación de tokens inválidos..." -ForegroundColor Yellow
 
 $fakeToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
@@ -142,35 +142,41 @@ Write-Host "HTTP Status: $httpCode" -ForegroundColor White
 
 if ($httpCode -eq "401") {
     Write-Host "✅ Token inválido correctamente rechazado (401)" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "⚠️  Token inválido devolvió: $httpCode (esperado 401)" -ForegroundColor Yellow
 }
 Write-Host ""
 
-# Test 6: Múltiples rutas protegidas con token válido
+# Test 5: Múltiples rutas protegidas con token válido
 if ($jwtToken) {
-    Write-Host "[TEST 6] Probando múltiples rutas protegidas con token..." -ForegroundColor Yellow
+    Write-Host "[TEST 5] Probando múltiples rutas protegidas con token..." -ForegroundColor Yellow
     
     $protectedEndpoints = @(
-        @{ Method = "GET"; Path = "/api/preferences/by-user?userId=test"; ExpectedCodes = @(200, 404, 400) },
-        @{ Method = "GET"; Path = "/api/sessions/user?userId=test"; ExpectedCodes = @(200, 404, 400) },
-        @{ Method = "GET"; Path = "/api/Analysis/by-user?userId=test"; ExpectedCodes = @(200, 404, 400) }
+        @{ Method = "GET"; Path = "/api/users"; ExpectedCodes = @(200) },
+        @{ Method = "GET"; Path = "/api/Analysis"; ExpectedCodes = @(200, 404) },
+        @{ Method = "GET"; Path = "/api/Report"; ExpectedCodes = @(200, 404) },
+        @{ Method = "GET"; Path = "/health"; ExpectedCodes = @(200) },
+        @{ Method = "GET"; Path = "/metrics"; ExpectedCodes = @(200) }
     )
     
     $allPassed = $true
     foreach ($endpoint in $protectedEndpoints) {
         $testResp = curl -X $endpoint.Method "$baseUrl$($endpoint.Path)" `
             -H "Authorization: Bearer $jwtToken" `
-            -s -w "%{http_code}" 2>&1
+            -s -w "`n%{http_code}" 2>&1
         
-        $code = $testResp | Select-Object -Last 1
+        $lines = $testResp -split "`n"
+        $code = $lines[-1]
         
         if ($endpoint.ExpectedCodes -contains [int]$code) {
             Write-Host "  ✅ $($endpoint.Method) $($endpoint.Path) → $code" -ForegroundColor Green
-        } elseif ($code -eq "401") {
+        }
+        elseif ($code -eq "401") {
             Write-Host "  ❌ $($endpoint.Method) $($endpoint.Path) → $code (token rechazado)" -ForegroundColor Red
             $allPassed = $false
-        } else {
+        }
+        else {
             Write-Host "  ⚠️  $($endpoint.Method) $($endpoint.Path) → $code" -ForegroundColor Yellow
         }
     }
@@ -178,8 +184,9 @@ if ($jwtToken) {
     if ($allPassed) {
         Write-Host "✅ Token JWT funciona en múltiples rutas protegidas" -ForegroundColor Green
     }
-} else {
-    Write-Host "[TEST 6] ⏭️  Saltado - No hay token disponible" -ForegroundColor Gray
+}
+else {
+    Write-Host "[TEST 5] ⏭️  Saltado - No hay token disponible" -ForegroundColor Gray
 }
 Write-Host ""
 
@@ -195,7 +202,8 @@ if ($jwtToken) {
     Write-Host "✅ Acceso con token: OK" -ForegroundColor Green
     Write-Host "✅ Rechazo sin token: OK" -ForegroundColor Green
     Write-Host "✅ Validación de token: OK" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "⚠️  Flujo JWT: PARCIAL" -ForegroundColor Yellow
     Write-Host "❌ Login: FALLO" -ForegroundColor Red
     Write-Host "✅ Rechazo sin token: OK" -ForegroundColor Green

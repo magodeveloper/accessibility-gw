@@ -72,8 +72,7 @@ namespace Gateway.UnitTests.Services
                 _mockCacheService,
                 _mockMetricsService,
                 _mockResiliencePolicyService,
-                _mockLogger,
-                Substitute.For<IHostEnvironment>()
+                _mockLogger
             );
         }
 
@@ -129,9 +128,9 @@ namespace Gateway.UnitTests.Services
         }
 
         [Theory]
-        [InlineData(ForwarderError.RequestTimedOut, 504)]
-        [InlineData(ForwarderError.NoAvailableDestinations, 502)]
-        [InlineData(ForwarderError.RequestBodyDestination, 502)]
+        [InlineData(ForwarderError.RequestTimedOut, 504)] // GatewayTimeout
+        [InlineData(ForwarderError.NoAvailableDestinations, 503)] // ServiceUnavailable
+        [InlineData(ForwarderError.RequestBodyDestination, 502)] // BadGateway
         public async Task ForwardAsync_ShouldMapDifferentForwarderErrorsCorrectly(ForwarderError forwarderError, int expectedStatusCode)
         {
             // Arrange
@@ -265,7 +264,7 @@ namespace Gateway.UnitTests.Services
             var responseBody = await new StreamReader(context.Response.Body).ReadToEndAsync();
 
             // Assert
-            context.Response.StatusCode.Should().Be(400);
+            context.Response.StatusCode.Should().Be(502); // BadGateway - error de conexión al backend
             var errorResponse = JsonSerializer.Deserialize<JsonElement>(responseBody);
             errorResponse.GetProperty("error").GetProperty("message").GetString().Should().Contain("Gateway forwarding error");
         }

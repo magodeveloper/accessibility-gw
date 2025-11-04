@@ -5,10 +5,10 @@ services:
       dockerfile: Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
-    image: accessibility-gateway:dev
-    container_name: accessibility-gw-dev
+    image: accessibility-gateway:latest
+    container_name: accessibility-gateway
     ports:
-      - '8101:8080'  # Puerto diferente para desarrollo
+      - "8100:8080" # Puerto estándar para desarrollo y producción
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
@@ -17,7 +17,7 @@ services:
       - Gate__Services__users=http://msusers-api:8081
       - Gate__Services__reports=http://msreports-api:8083
       - Gate__Services__analysis=http://msanalysis-api:8082
-      - Gate__Services__middleware=http://accessibility-mw-prod:3001
+      - Gate__Services__middleware=http://accessibility-mw:3001
       - Redis__ConnectionString=accessibility-redis-dev:6379
       - Jwt__Authority=https://localhost:8100
       - Jwt__Audience=accessibility-gateway
@@ -41,7 +41,7 @@ services:
     tmpfs:
       - /tmp
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:8080/health/live || exit 1']
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/live || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -49,17 +49,17 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
+          cpus: "2.0"
           memory: 1G
         reservations:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 512M
 
   redis-dev:
     image: redis:7.2-alpine
     container_name: accessibility-redis-dev
     ports:
-      - '6380:6379'  # Puerto diferente para evitar conflictos
+      - "6380:6379" # Puerto diferente para evitar conflictos
     volumes:
       - redis-dev-data:/data
       - /etc/localtime:/etc/localtime:ro
@@ -76,7 +76,7 @@ services:
       --timeout 0 
       --loglevel verbose
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD", "redis-cli", "ping"]
       interval: 15s
       timeout: 3s
       retries: 3
@@ -84,10 +84,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.3'
+          cpus: "0.3"
           memory: 128M
         reservations:
-          cpus: '0.1'
+          cpus: "0.1"
           memory: 32M
 
   # Servicio opcional para monitoreo en desarrollo
@@ -95,7 +95,7 @@ services:
     image: rediscommander/redis-commander:latest
     container_name: redis-commander-dev
     ports:
-      - '8082:8081'
+      - "8082:8081"
     environment:
       - REDIS_HOSTS=dev:accessibility-redis-dev:6379
     depends_on:
@@ -105,7 +105,7 @@ services:
       - accessibility-shared
     restart: unless-stopped
     profiles:
-      - tools  # Solo se ejecuta con --profile tools
+      - tools # Solo se ejecuta con --profile tools
 
 volumes:
   gateway-dev-logs:
