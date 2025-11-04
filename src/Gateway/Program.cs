@@ -5,8 +5,8 @@ using System.Net;
 using Prometheus;
 using Gateway.Models;
 using Gateway.Services;
-using Gateway.Middleware;
 using System.Text.Json;
+using Gateway.Middleware;
 using Polly.Extensions.Http;
 using System.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
@@ -16,9 +16,9 @@ using Yarp.ReverseProxy.Forwarder;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using System.ComponentModel.DataAnnotations;
 
 var builder = WebApplication.CreateBuilder(args);
 

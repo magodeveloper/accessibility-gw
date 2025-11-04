@@ -202,96 +202,6 @@ function Show-ServicesSummary {
     Write-ColorOutput "  Password: admin" "Cyan"
 }
 
-# DEPRECATED: Redis es ahora parte del stack de desarrollo (docker-compose.dev.yml)
-# Estas funciones se mantienen solo como referencia histórica
-<#
-function Start-RedisContainer {
-    Write-Section "🚀 Iniciando Redis para Tests"
-    
-    if (-not (Test-DockerRunning)) {
-        return $false
-    }
-    
-    # Limpiar contenedor existente
-    if (Test-ContainerExists $RedisConfig.ContainerName) {
-        Write-ColorOutput "🔄 Eliminando contenedor Redis existente..." "Yellow"
-        Stop-DockerContainer $RedisConfig.ContainerName -Remove $true | Out-Null
-        Write-ColorOutput "✅ Contenedor anterior eliminado" "Green"
-    }
-    
-    # Iniciar nuevo contenedor
-    Write-ColorOutput "`n🚀 Iniciando contenedor Redis..." "Cyan"
-    $containerId = docker run -d --name $RedisConfig.ContainerName -p "$($RedisConfig.Port):6379" $RedisConfig.Image
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-ColorOutput "✅ Redis iniciado correctamente" "Green"
-        Write-ColorOutput "📍 Container ID: $containerId" "Gray"
-        Write-ColorOutput "🔌 Puerto: $($RedisConfig.Port)" "Gray"
-        Write-Host ""
-        Write-ColorOutput "Para detener Redis:" "Cyan"
-        Write-ColorOutput "  docker compose -f docker-compose.dev.yml down redis" "White"
-        Write-Host ""
-        Write-ColorOutput "Para ver los logs:" "Cyan"
-        Write-ColorOutput "  docker logs accessibility-redis" "White"
-        return $true
-    }
-    else {
-        Write-ColorOutput "❌ Error al iniciar Redis" "Red"
-        return $false
-    }
-}
-
-function Stop-RedisContainer {
-    Write-Section "🛑 Deteniendo Redis"
-    
-    if (Stop-DockerContainer $RedisConfig.ContainerName -Remove $true) {
-        Write-ColorOutput "✅ Redis detenido y eliminado correctamente" "Green"
-        return $true
-    }
-    else {
-        Write-ColorOutput "ℹ️  No hay contenedor $($RedisConfig.ContainerName) para detener" "Cyan"
-        return $false
-    }
-}
-
-function Get-RedisStatus {
-    Write-Section "📊 Estado de Redis"
-    
-    $containerName = $RedisConfig.ContainerName
-    
-    if (Test-ContainerRunning $containerName) {
-        $container = docker ps --filter "name=$containerName" --format "{{.Names}}\t{{.Status}}\t{{.Ports}}"
-        Write-ColorOutput "✅ Redis está corriendo" "Green"
-        Write-Host ""
-        Write-Host $container
-        Write-Host ""
-        
-        # Intentar hacer ping a Redis
-        try {
-            $response = docker exec $containerName redis-cli ping 2>$null
-            if ($response -eq "PONG") {
-                Write-ColorOutput "✅ Redis responde correctamente (PONG)" "Green"
-            }
-        }
-        catch {
-            Write-ColorOutput "⚠️  Redis está corriendo pero no responde a ping" "Yellow"
-        }
-    }
-    elseif (Test-ContainerExists $containerName) {
-        Write-ColorOutput "⏸️  Redis existe pero está detenido" "Yellow"
-        Write-Host ""
-        Write-ColorOutput "Para iniciarlo ejecuta:" "Cyan"
-        Write-ColorOutput "  docker compose -f docker-compose.dev.yml up -d redis" "White"
-    }
-    else {
-        Write-ColorOutput "❌ Redis no está corriendo" "Red"
-        Write-Host ""
-        Write-ColorOutput "Para iniciarlo ejecuta:" "Cyan"
-        Write-ColorOutput "  docker compose -f docker-compose.dev.yml up -d redis" "White"
-    }
-}
-#>
-
 # ============================================
 # Acciones
 # ============================================
@@ -588,10 +498,6 @@ switch ($Action) {
         Write-ColorOutput "  - Alertas y silences de Alertmanager" "Gray"
         Write-ColorOutput "  - Dashboards y configuración de Grafana" "Gray"
     }
-    
-    # NOTA: Redis ahora es parte del stack de desarrollo (docker-compose.dev.yml)
-    # No es necesario tener comandos separados para gestionarlo aquí
-    # Para gestionar Redis, usar: docker-compose -f docker-compose.dev.yml up -d redis
     
     default {
         Write-ColorOutput "Acción no reconocida: $Action" "Red"
