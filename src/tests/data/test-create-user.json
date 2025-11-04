@@ -1,0 +1,8 @@
+{
+  "nickname": "testuser",
+  "name": "Test",
+  "lastname": "User",
+  "email": "test@accessibility.com",
+  "password": "password",
+  "role": "admin"
+}

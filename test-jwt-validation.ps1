@@ -12,37 +12,111 @@
 
 $ErrorActionPreference = "Continue"
 $baseUrl = "http://localhost:8100"
+$loginFile = "src/tests/data/test-login.example.json"
 
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  VALIDACIÓN COMPLETA JWT AUTHENTICATION" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Verificar que existe el archivo de credenciales
+if (-not (Test-Path $loginFile)) {
+    Write-Host "❌ ERROR: No se encontró el archivo '$loginFile'" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "📝 El archivo debe contener credenciales válidas en formato:" -ForegroundColor Yellow
+    Write-Host @"
+{
+  "email": "test1@example.com",
+  "password": "Test123!"
+}
+"@ -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "💡 Crea el archivo '$loginFile' con credenciales válidas de tu sistema." -ForegroundColor Cyan
+    exit 1
+}
+
 # Test 1: Login y obtención de token JWT
 Write-Host "[TEST 1] Login y Obtención de Token JWT" -ForegroundColor Yellow
 Write-Host "Endpoint: POST /api/Auth/login" -ForegroundColor White
+Write-Host "Archivo de credenciales: $loginFile" -ForegroundColor DarkGray
+Write-Host ""
 
-$loginResponse = curl -X POST "$baseUrl/api/Auth/login" `
-    -H "Content-Type: application/json" `
-    --data-binary "@test-login.json" `
-    -s 2>&1
-
-if ($loginResponse -match '"token"') {
-    Write-Host "✅ Login EXITOSO" -ForegroundColor Green
-    
-    # Extraer token del JSON
-    $jsonResponse = $loginResponse | ConvertFrom-Json
-    $token = $jsonResponse.token
-    $expiresAt = $jsonResponse.expiresAt
-    $user = $jsonResponse.user
-    
-    Write-Host "   Usuario: $($user.name) $($user.lastname) ($($user.email))" -ForegroundColor DarkGray
-    Write-Host "   Role: $($user.role)" -ForegroundColor DarkGray
-    Write-Host "   Token (primeros 50 chars): $($token.Substring(0, 50))..." -ForegroundColor DarkGray
-    Write-Host "   Expira: $expiresAt" -ForegroundColor DarkGray
+# Verificar que el Gateway está corriendo
+try {
+    $healthCheck = Invoke-WebRequest -Uri "$baseUrl/health/live" -Method GET -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+    Write-Host "✓ Gateway está corriendo" -ForegroundColor Green
+} catch {
+    Write-Host "❌ ERROR: Gateway NO está corriendo en $baseUrl" -ForegroundColor Red
+    Write-Host "   Por favor, inicia el Gateway primero:" -ForegroundColor Yellow
+    Write-Host "   docker-compose up -d" -ForegroundColor White
+    Write-Host ""
+    exit 1
 }
-else {
-    Write-Host "❌ Login FALLÓ: $loginResponse" -ForegroundColor Red
+
+# Leer el contenido del archivo
+$loginData = Get-Content $loginFile -Raw
+
+Write-Host "Enviando request de login..." -ForegroundColor DarkGray
+Write-Host ""
+
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/api/Auth/login" `
+        -Method POST `
+        -ContentType "application/json" `
+        -Body $loginData `
+        -UseBasicParsing `
+        -ErrorAction Stop
+    
+    $loginResponse = $response.Content
+    
+    if ($loginResponse -match '"token"') {
+        Write-Host "✅ Login EXITOSO" -ForegroundColor Green
+        
+        # Extraer token del JSON
+        $jsonResponse = $loginResponse | ConvertFrom-Json
+        $token = $jsonResponse.token
+        $expiresAt = $jsonResponse.expiresAt
+        $user = $jsonResponse.user
+        
+        Write-Host "   Usuario: $($user.name) $($user.lastname) ($($user.email))" -ForegroundColor DarkGray
+        Write-Host "   Role: $($user.role)" -ForegroundColor DarkGray
+        Write-Host "   Token (primeros 50 chars): $($token.Substring(0, [Math]::Min(50, $token.Length)))..." -ForegroundColor DarkGray
+        Write-Host "   Expira: $expiresAt" -ForegroundColor DarkGray
+    }
+    else {
+        Write-Host "❌ Login FALLÓ - Respuesta inesperada" -ForegroundColor Red
+        Write-Host "Respuesta: $loginResponse" -ForegroundColor Gray
+        exit 1
+    }
+}
+catch {
+    $statusCode = $null
+    if ($_.Exception.Response) {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+    }
+    
+    Write-Host "❌ Login FALLÓ - Error de conexión" -ForegroundColor Red
+    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Gray
+    
+    if ($statusCode -eq 401) {
+        Write-Host ""
+        Write-Host "⚠️  CREDENCIALES INVÁLIDAS" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "El usuario en '$loginFile' no existe o la contraseña es incorrecta." -ForegroundColor White
+        Write-Host ""
+        Write-Host "� Edita '$loginFile' con un usuario válido de tu sistema" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "� Formato requerido:" -ForegroundColor Cyan
+        Write-Host @"
+{
+  "email": "usuario-real@example.com",
+  "password": "contraseña-real"
+}
+"@ -ForegroundColor Gray
+    }
+    else {
+        Write-Host "StatusCode: $statusCode" -ForegroundColor Gray
+    }
     exit 1
 }
 Write-Host ""
@@ -58,22 +132,25 @@ $protectedRoutes = @(
 
 $allSuccess = $true
 foreach ($route in $protectedRoutes) {
-    $response = curl -X $route.Method "$baseUrl$($route.Path)" `
-        -H "Authorization: Bearer $token" `
-        -s -w "`n%{http_code}" 2>&1
-    
-    $lines = $response -split "`n"
-    $httpCode = $lines[-1]
-    
-    if ($httpCode -eq "200") {
-        Write-Host "  ✅ $($route.Method) $($route.Path) → 200 OK" -ForegroundColor Green
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl$($route.Path)" `
+            -Method $route.Method `
+            -Headers @{ "Authorization" = "Bearer $token" } `
+            -UseBasicParsing `
+            -ErrorAction Stop
+        
+        $httpCode = $response.StatusCode
+        Write-Host "  ✅ $($route.Method) $($route.Path) → $httpCode OK" -ForegroundColor Green
     }
-    elseif ($httpCode -eq "404" -or $httpCode -eq "400") {
-        Write-Host "  ✅ $($route.Method) $($route.Path) → $httpCode (acceso permitido, recurso no encontrado)" -ForegroundColor Green
-    }
-    else {
-        Write-Host "  ❌ $($route.Method) $($route.Path) → $httpCode (esperado 200/404)" -ForegroundColor Red
-        $allSuccess = $false
+    catch {
+        $httpCode = $_.Exception.Response.StatusCode.value__
+        if ($httpCode -eq 404 -or $httpCode -eq 400) {
+            Write-Host "  ✅ $($route.Method) $($route.Path) → $httpCode (acceso permitido, recurso no encontrado)" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  ❌ $($route.Method) $($route.Path) → $httpCode (esperado 200/404)" -ForegroundColor Red
+            $allSuccess = $false
+        }
     }
 }
 
@@ -85,17 +162,22 @@ Write-Host ""
 # Test 3: Acceso a ruta protegida SIN token
 Write-Host "[TEST 3] Rechazo de Acceso SIN Token" -ForegroundColor Yellow
 
-$noTokenResponse = curl -X GET "$baseUrl/api/users" `
-    -s -w "`n%{http_code}" 2>&1
-
-$lines = $noTokenResponse -split "`n"
-$httpCode = $lines[-1]
-
-if ($httpCode -eq "401") {
-    Write-Host "✅ GET /api/users sin token → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/api/users" `
+        -Method GET `
+        -UseBasicParsing `
+        -ErrorAction Stop
+    
+    Write-Host "❌ GET /api/users sin token → $($response.StatusCode) (esperado 401)" -ForegroundColor Red
 }
-else {
-    Write-Host "❌ GET /api/users sin token → $httpCode (esperado 401)" -ForegroundColor Red
+catch {
+    $httpCode = $_.Exception.Response.StatusCode.value__
+    if ($httpCode -eq 401) {
+        Write-Host "✅ GET /api/users sin token → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
+    }
+    else {
+        Write-Host "❌ GET /api/users sin token → $httpCode (esperado 401)" -ForegroundColor Red
+    }
 }
 Write-Host ""
 
@@ -105,18 +187,23 @@ Write-Host "[TEST 4] Validación de Token INVÁLIDO" -ForegroundColor Yellow
 # Token JWT inválido (firma incorrecta)
 $invalidToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
-$invalidResponse = curl -X GET "$baseUrl/api/users" `
-    -H "Authorization: Bearer $invalidToken" `
-    -s -w "`n%{http_code}" 2>&1
-
-$lines = $invalidResponse -split "`n"
-$httpCode = $lines[-1]
-
-if ($httpCode -eq "401") {
-    Write-Host "✅ Token inválido rechazado → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/api/users" `
+        -Method GET `
+        -Headers @{ "Authorization" = "Bearer $invalidToken" } `
+        -UseBasicParsing `
+        -ErrorAction Stop
+    
+    Write-Host "❌ GET /api/users con token inválido → $($response.StatusCode) (esperado 401)" -ForegroundColor Red
 }
-else {
-    Write-Host "❌ Token inválido aceptado → $httpCode (esperado 401)" -ForegroundColor Red
+catch {
+    $httpCode = $_.Exception.Response.StatusCode.value__
+    if ($httpCode -eq 401) {
+        Write-Host "✅ Token inválido rechazado → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
+    }
+    else {
+        Write-Host "❌ Token inválido aceptado → $httpCode (esperado 401)" -ForegroundColor Red
+    }
 }
 Write-Host ""
 
@@ -125,18 +212,23 @@ Write-Host "[TEST 5] Validación de Token MALFORMADO" -ForegroundColor Yellow
 
 $malformedToken = "esto-no-es-un-token-jwt-valido"
 
-$malformedResponse = curl -X GET "$baseUrl/api/users" `
-    -H "Authorization: Bearer $malformedToken" `
-    -s -w "`n%{http_code}" 2>&1
-
-$lines = $malformedResponse -split "`n"
-$httpCode = $lines[-1]
-
-if ($httpCode -eq "401") {
-    Write-Host "✅ Token malformado rechazado → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/api/users" `
+        -Method GET `
+        -Headers @{ "Authorization" = "Bearer $malformedToken" } `
+        -UseBasicParsing `
+        -ErrorAction Stop
+    
+    Write-Host "❌ GET /api/users con token malformado → $($response.StatusCode) (esperado 401)" -ForegroundColor Red
 }
-else {
-    Write-Host "❌ Token malformado aceptado → $httpCode (esperado 401)" -ForegroundColor Red
+catch {
+    $httpCode = $_.Exception.Response.StatusCode.value__
+    if ($httpCode -eq 401) {
+        Write-Host "✅ Token malformado rechazado → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
+    }
+    else {
+        Write-Host "❌ Token malformado aceptado → $httpCode (esperado 401)" -ForegroundColor Red
+    }
 }
 Write-Host ""
 
@@ -150,32 +242,46 @@ $deleteRoutes = @(
 
 Write-Host "  Sin token:" -ForegroundColor White
 foreach ($path in $deleteRoutes) {
-    $response = curl -X DELETE "$baseUrl$path" -s -w "`n%{http_code}" 2>&1
-    $lines = $response -split "`n"
-    $code = $lines[-1]
-    
-    if ($code -eq "401") {
-        Write-Host "    ✅ DELETE $path → 401" -ForegroundColor Green
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl$path" `
+            -Method DELETE `
+            -UseBasicParsing `
+            -ErrorAction Stop
+        
+        Write-Host "    ❌ DELETE $path → $($response.StatusCode) (esperado 401)" -ForegroundColor Red
     }
-    else {
-        Write-Host "    ❌ DELETE $path → $code (esperado 401)" -ForegroundColor Red
+    catch {
+        $code = $_.Exception.Response.StatusCode.value__
+        if ($code -eq 401) {
+            Write-Host "    ✅ DELETE $path → 401" -ForegroundColor Green
+        }
+        else {
+            Write-Host "    ❌ DELETE $path → $code (esperado 401)" -ForegroundColor Red
+        }
     }
 }
 
 Write-Host "  Con token válido:" -ForegroundColor White
 foreach ($path in $deleteRoutes) {
-    $response = curl -X DELETE "$baseUrl$path" `
-        -H "Authorization: Bearer $token" `
-        -s -w "`n%{http_code}" 2>&1
-    $lines = $response -split "`n"
-    $code = $lines[-1]
-    
-    # Esperamos 200, 404, 400, 500 (cualquier cosa excepto 401/403)
-    if ($code -ne "401" -and $code -ne "403") {
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl$path" `
+            -Method DELETE `
+            -Headers @{ "Authorization" = "Bearer $token" } `
+            -UseBasicParsing `
+            -ErrorAction Stop
+        
+        $code = $response.StatusCode
+        # Esperamos 200, 404, 400, 500 (cualquier cosa excepto 401/403)
         Write-Host "    ✅ DELETE $path → $code (acceso permitido)" -ForegroundColor Green
     }
-    else {
-        Write-Host "    ❌ DELETE $path → $code (token rechazado)" -ForegroundColor Red
+    catch {
+        $code = $_.Exception.Response.StatusCode.value__
+        if ($code -ne 401 -and $code -ne 403) {
+            Write-Host "    ✅ DELETE $path → $code (acceso permitido)" -ForegroundColor Green
+        }
+        else {
+            Write-Host "    ❌ DELETE $path → $code (token rechazado)" -ForegroundColor Red
+        }
     }
 }
 Write-Host ""
@@ -190,19 +296,25 @@ $publicRoutes = @(
 )
 
 foreach ($route in $publicRoutes) {
-    $response = curl -X $route.Method "$baseUrl$($route.Path)" `
-        -H "Content-Type: application/json" `
-        -s -w "`n%{http_code}" 2>&1
-    
-    $lines = $response -split "`n"
-    $code = $lines[-1]
-    
-    # Rutas públicas no deben devolver 401/403
-    if ($code -ne "401" -and $code -ne "403") {
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl$($route.Path)" `
+            -Method $route.Method `
+            -ContentType "application/json" `
+            -UseBasicParsing `
+            -ErrorAction Stop
+        
+        $code = $response.StatusCode
         Write-Host "  ✅ $($route.Method) $($route.Path) → $code (accesible sin token)" -ForegroundColor Green
     }
-    else {
-        Write-Host "  ❌ $($route.Method) $($route.Path) → $code (NO debería requerir token)" -ForegroundColor Red
+    catch {
+        $code = $_.Exception.Response.StatusCode.value__
+        # Rutas públicas no deben devolver 401/403
+        if ($code -ne 401 -and $code -ne 403) {
+            Write-Host "  ✅ $($route.Method) $($route.Path) → $code (accesible sin token)" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  ❌ $($route.Method) $($route.Path) → $code (NO debería requerir token)" -ForegroundColor Red
+        }
     }
 }
 Write-Host ""

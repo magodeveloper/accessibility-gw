@@ -65,12 +65,12 @@ export function recordRequestMetrics(response, service = 'gateway') {
 
 // Función para actualizar métricas de usuarios activos
 export function updateActiveUsers(count) {
-    gatewayMetrics.concurrentUsers.set(count);
+    gatewayMetrics.concurrentUsers.add(count);
 }
 
 // Función para registrar conexiones activas
 export function updateActiveConnections(count) {
-    gatewayMetrics.activeConnections.set(count);
+    gatewayMetrics.activeConnections.add(count);
 }
 
 // Función para obtener summary de métricas
