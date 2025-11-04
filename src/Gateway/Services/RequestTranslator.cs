@@ -424,6 +424,22 @@ public class CustomHostTransformer : HttpTransformer
         // Establecer la URI de destino manualmente
         proxyRequest.RequestUri = new Uri(_targetUri);
 
+        // Propagar headers de autenticación/autorización desde HttpContext
+        // (estos fueron agregados por JwtClaimsTransformMiddleware)
+        // IMPORTANTE: Remover primero para evitar duplicados ya que YARP copia automáticamente los headers
+        var headersToPropagate = new[] { "X-User-Id", "X-User-Email", "X-User-Role", "X-User-Name", "X-Gateway-Secret" };
+        foreach (var headerName in headersToPropagate)
+        {
+            if (httpContext.Request.Headers.TryGetValue(headerName, out var headerValue))
+            {
+                // Remover el header si ya existe para evitar duplicados (YARP lo copia automáticamente)
+                proxyRequest.Headers.Remove(headerName);
+                // Ahora añadirlo con el valor correcto
+                proxyRequest.Headers.TryAddWithoutValidation(headerName, headerValue.ToString());
+                Console.WriteLine($"=== PROPAGATED HEADER === {headerName}: {headerValue}");
+            }
+        }
+
         // Si tenemos un body personalizado, usarlo
         if (!string.IsNullOrEmpty(_requestBody) && proxyRequest.Method != HttpMethod.Get && proxyRequest.Method != HttpMethod.Delete)
         {

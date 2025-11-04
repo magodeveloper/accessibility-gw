@@ -32,6 +32,7 @@ services:
 
     networks:
       - accessibility-network
+      - accessibility-shared
 
     depends_on:
       - alertmanager
@@ -182,6 +183,10 @@ networks:
     ipam:
       config:
         - subnet: 172.25.0.0/16
+
+  accessibility-shared:
+    external: true
+    name: accessibility-shared
 
 # ============================================
 # Volumes (Persistencia)

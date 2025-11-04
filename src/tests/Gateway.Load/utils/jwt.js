@@ -95,7 +95,8 @@ export function generateTestUserToken(
         sub: userId,
         email: email,
         name: `Load Test User ${userId}`,
-        roles: roles,
+        role: roles[0],  // Claim individual para el middleware (espera string, no array)
+        roles: roles,    // Claim array para compatibilidad
         jti: `${userId}-${Date.now()}` // Unique token ID
     };
 

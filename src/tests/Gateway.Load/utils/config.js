@@ -69,9 +69,9 @@ export const endpoints = {
     ready: '/ready',
     metrics: '/metrics',
 
-    // Servicios a través del Gateway
+    // Servicios a través del Gateway - Rutas reales del Gateway
     users: {
-        base: '/api/v1/services/users',
+        base: '/api',
         endpoints: {
             list: '/users',
             create: '/users',
@@ -79,25 +79,25 @@ export const endpoints = {
             update: '/users/:id',
             delete: '/users/:id',
             profile: '/users/:id/profile',
-            preferences: '/users/:id/preferences',
+            preferences: '/preferences',
             largeRequest: '/large-request'
         }
     },
 
     analysis: {
-        base: '/api/v1/services/analysis',
+        base: '/api',
         endpoints: {
-            analyze: '/analyze',
-            reports: '/reports',
-            batch: '/batch-analyze',
-            status: '/status/:id'
+            analyze: '/Analysis',
+            reports: '/Result',
+            batch: '/Analysis',
+            status: '/Analysis/:id'
         }
     },
 
     reports: {
-        base: '/api/v1/services/reports',
+        base: '/api',
         endpoints: {
-            generate: '/generate',
+            generate: '/Report',
             list: '/reports',
             download: '/reports/:id/download',
             export: '/reports/:id/export'
@@ -107,30 +107,64 @@ export const endpoints = {
 
 // Función para generar datos de prueba
 export function generateTestData() {
+    const randomStr = Math.random().toString(36).substring(7);
+    const now = new Date().toISOString();
+    const randomId = Math.floor(Math.random() * 1000) + 1;
+
     return {
         user: {
-            name: `TestUser_${Math.random().toString(36).substring(7)}`,
-            email: `test_${Math.random().toString(36).substring(7)}@example.com`,
-            age: Math.floor(Math.random() * 50) + 18,
-            preferences: {
-                theme: Math.random() > 0.5 ? 'dark' : 'light',
-                notifications: Math.random() > 0.5,
-                language: ['es', 'en', 'fr'][Math.floor(Math.random() * 3)]
-            }
+            // UserCreateDto: record UserCreateDto(string Nickname, string Name, string Lastname, string Email, string Password)
+            nickname: `nick_${randomStr}`,
+            name: `TestUser_${randomStr}`,
+            lastname: `TestLastname_${randomStr}`,
+            email: `test_${randomStr}@loadtest.com`,
+            password: `TestPass123!${randomStr}`  // Campo Password requerido
         },
         analysis: {
-            url: `https://example.com/page${Math.floor(Math.random() * 1000)}`,
-            type: ['accessibility', 'performance', 'seo'][Math.floor(Math.random() * 3)],
-            options: {
-                includeImages: Math.random() > 0.5,
-                checkContrast: Math.random() > 0.5,
-                validateHtml: Math.random() > 0.5
-            }
+            // AnalysisCreateDto - todos los campos requeridos del microservicio
+            userId: randomId,
+            dateAnalysis: now,
+            contentType: 'HTML',
+            contentInput: '<html><head><title>Test Page</title></head><body><h1>Accessibility Test</h1><p>This is a test page for load testing.</p></body></html>',
+            sourceUrl: `https://example.com/test-page-${randomStr}`,
+            toolUsed: 'Axe',  // Axe, EqualAccess, etc.
+            status: 'Completed',  // Pending, InProgress, Completed, Failed
+            summaryResult: 'Test analysis completed successfully. No critical violations found.',
+            resultJson: JSON.stringify({
+                violations: [],
+                passes: [
+                    { id: 'html-has-lang', impact: 'serious', description: 'HTML has lang attribute' }
+                ],
+                incomplete: [],
+                inapplicable: []
+            }),
+            durationMs: Math.floor(Math.random() * 5000) + 1000,  // 1-6 segundos
+            wcagVersion: '2.1',  // 2.0, 2.1, 2.2
+            wcagLevel: 'AA',  // A, AA, AAA
+            // Métricas específicas de Axe
+            axeViolations: 0,
+            axeNeedsReview: 0,
+            axeRecommendations: Math.floor(Math.random() * 5),
+            axePasses: Math.floor(Math.random() * 20) + 5,
+            axeIncomplete: 0,
+            axeInapplicable: Math.floor(Math.random() * 10),
+            // Métricas específicas de EqualAccess
+            eaViolations: null,
+            eaNeedsReview: null,
+            eaRecommendations: null,
+            eaPasses: null,
+            eaIncomplete: null,
+            eaInapplicable: null
         },
         report: {
-            title: `Report_${Math.random().toString(36).substring(7)}`,
-            format: ['pdf', 'html', 'json'][Math.floor(Math.random() * 3)],
-            includeDetails: Math.random() > 0.5
+            // ReportDto completo según el controlador
+            id: 0,  // Se ignora en creación
+            analysisId: randomId,
+            format: Math.floor(Math.random() * 3),  // 0=PDF, 1=HTML, 2=JSON (enum ReportFormat)
+            filePath: '',  // Se genera en el servidor
+            generationDate: now,
+            createdAt: now,
+            updatedAt: now
         }
     };
 }

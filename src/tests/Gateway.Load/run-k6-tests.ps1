@@ -22,6 +22,25 @@ $ScriptDir = $PSScriptRoot
 $ResultsDir = "$ScriptDir\results"
 $ScenariosDir = "$ScriptDir\scenarios"
 
+# Cargar variables de entorno desde .env
+$envFile = "$ScriptDir\.env"
+if (Test-Path $envFile) {
+    Write-Host "📄 Cargando variables de entorno desde .env..." -ForegroundColor Cyan
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*([^#][^=]+?)\s*=\s*(.+?)\s*$') {
+            $name = $Matches[1]
+            $value = $Matches[2]
+            Set-Item -Path "env:$name" -Value $value
+            Write-Host "   ✓ $name configurado" -ForegroundColor DarkGray
+        }
+    }
+    Write-Host ""
+}
+else {
+    Write-Host "⚠️  Archivo .env no encontrado en: $envFile" -ForegroundColor Yellow
+    Write-Host "   Las variables JWT pueden no estar configuradas correctamente.`n" -ForegroundColor Yellow
+}
+
 function Show-Help {
     Write-Host "`n╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
     Write-Host "║       🧪 Gateway K6 Load Tests - Script de Ejecución        ║" -ForegroundColor Cyan

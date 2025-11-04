@@ -406,8 +406,11 @@ app.UseMiddleware<RouteAuthorizationMiddleware>();
 if (!string.IsNullOrWhiteSpace(secretKey))
 {
     app.UseAuthorization();
-    app.UseMiddleware<JwtClaimsTransformMiddleware>();
 }
+
+// JwtClaimsTransformMiddleware DEBE estar ANTES del proxy y del enrutamiento automático
+// para que agregue X-User-* y X-Gateway-Secret headers
+app.UseMiddleware<JwtClaimsTransformMiddleware>();
 
 app.UseRateLimiter();
 app.UseOutputCache();

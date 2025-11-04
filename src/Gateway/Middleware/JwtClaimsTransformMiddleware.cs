@@ -30,12 +30,19 @@ public class JwtClaimsTransformMiddleware
         if (!string.IsNullOrEmpty(_gatewaySecret))
         {
             context.Request.Headers["X-Gateway-Secret"] = _gatewaySecret;
-            _logger.LogDebug("Added X-Gateway-Secret header");
+            _logger.LogInformation("=== JWT MIDDLEWARE === Added X-Gateway-Secret header: '{Secret}' (length: {Length})",
+                _gatewaySecret, _gatewaySecret.Length);
+        }
+        else
+        {
+            _logger.LogWarning("=== JWT MIDDLEWARE === Gateway secret is NULL or empty!");
         }
 
         // Solo procesar claims si el usuario está autenticado
         if (context.User.Identity?.IsAuthenticated == true)
         {
+            _logger.LogInformation("=== JWT MIDDLEWARE === User IS authenticated");
+
             try
             {
                 // Extraer claims del JWT

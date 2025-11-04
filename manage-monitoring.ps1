@@ -5,7 +5,7 @@
 
 param(
     [Parameter(Mandatory = $false)]
-    [ValidateSet('start', 'stop', 'restart', 'status', 'logs', 'test-alerts', 'validate', 'clean', 'start-redis', 'stop-redis', 'redis-status')]
+    [ValidateSet('start', 'stop', 'restart', 'status', 'logs', 'test-alerts', 'validate', 'clean')]
     [string]$Action = 'status',
     
     [Parameter(Mandatory = $false)]
@@ -202,6 +202,9 @@ function Show-ServicesSummary {
     Write-ColorOutput "  Password: admin" "Cyan"
 }
 
+# DEPRECATED: Redis es ahora parte del stack de desarrollo (docker-compose.dev.yml)
+# Estas funciones se mantienen solo como referencia histórica
+<#
 function Start-RedisContainer {
     Write-Section "🚀 Iniciando Redis para Tests"
     
@@ -226,10 +229,10 @@ function Start-RedisContainer {
         Write-ColorOutput "🔌 Puerto: $($RedisConfig.Port)" "Gray"
         Write-Host ""
         Write-ColorOutput "Para detener Redis:" "Cyan"
-        Write-ColorOutput "  .\manage-monitoring.ps1 -Action stop-redis" "White"
+        Write-ColorOutput "  docker compose -f docker-compose.dev.yml down redis" "White"
         Write-Host ""
         Write-ColorOutput "Para ver los logs:" "Cyan"
-        Write-ColorOutput "  docker logs $($RedisConfig.ContainerName)" "White"
+        Write-ColorOutput "  docker logs accessibility-redis" "White"
         return $true
     }
     else {
@@ -278,15 +281,16 @@ function Get-RedisStatus {
         Write-ColorOutput "⏸️  Redis existe pero está detenido" "Yellow"
         Write-Host ""
         Write-ColorOutput "Para iniciarlo ejecuta:" "Cyan"
-        Write-ColorOutput "  .\manage-monitoring.ps1 -Action start-redis" "White"
+        Write-ColorOutput "  docker compose -f docker-compose.dev.yml up -d redis" "White"
     }
     else {
         Write-ColorOutput "❌ Redis no está corriendo" "Red"
         Write-Host ""
         Write-ColorOutput "Para iniciarlo ejecuta:" "Cyan"
-        Write-ColorOutput "  .\manage-monitoring.ps1 -Action start-redis" "White"
+        Write-ColorOutput "  docker compose -f docker-compose.dev.yml up -d redis" "White"
     }
 }
+#>
 
 # ============================================
 # Acciones
@@ -315,9 +319,8 @@ switch ($Action) {
             # Resumen
             Show-ServicesSummary $healthResults
             
-            # Iniciar Redis
-            Write-Host ""
-            Start-RedisContainer | Out-Null
+            # Nota: Redis ya está corriendo en el stack de desarrollo (accessibility-redis-dev)
+            # No es necesario iniciar otro contenedor Redis
         }
         else {
             Write-ColorOutput "❌ Error al iniciar servicios" "Red"
@@ -333,9 +336,8 @@ switch ($Action) {
             Write-ColorOutput "✅ Servicios detenidos correctamente" "Green"
         }
         
-        # Detener Redis
-        Write-Host ""
-        Stop-RedisContainer
+        # Nota: No detener Redis porque es parte del stack de desarrollo
+        # Redis (accessibility-redis-dev) debe permanecer corriendo
     }
     
     'restart' {
@@ -348,12 +350,8 @@ switch ($Action) {
             Write-ColorOutput "⏳ Esperando a que los servicios estén listos..." "Yellow"
             Start-Sleep -Seconds 15
             
-            # Reiniciar Redis
-            Write-Host ""
-            Write-ColorOutput "🔄 Reiniciando Redis..." "Yellow"
-            Stop-RedisContainer | Out-Null
-            Start-Sleep -Seconds 2
-            Start-RedisContainer | Out-Null
+            # Nota: Redis ya está corriendo en el stack de desarrollo
+            # No es necesario reiniciarlo aquí
             
             # Health check de todos los servicios
             Test-AllServicesHealth -MaxRetries 10 | Out-Null
@@ -401,30 +399,22 @@ switch ($Action) {
             Write-ColorOutput "⚠️ No se pueden obtener alertas (Prometheus no está corriendo?)" "Yellow"
         }
         
-        # Estado de Redis
-        Write-Host ""
-        Get-RedisStatus
+        # Nota: Redis es parte del stack de desarrollo y se muestra en el docker compose ps arriba
     }
     
     'logs' {
         Write-Section "📜 Logs de Servicios"
         
         if ($Service -eq 'redis') {
-            # Logs de Redis (contenedor independiente)
-            if (Test-ContainerRunning $RedisConfig.ContainerName) {
-                Write-ColorOutput "Mostrando logs de Redis (últimas 50 líneas)..." "Yellow"
-                docker logs --tail=50 -f $RedisConfig.ContainerName
-            }
-            else {
-                Write-ColorOutput "❌ Redis no está corriendo" "Red"
-                Write-ColorOutput "Inicia Redis con: .\manage-monitoring.ps1 -Action start-redis" "Cyan"
-            }
+            # Redis es parte del stack de desarrollo
+            Write-ColorOutput "⚠️ Redis es parte del stack de desarrollo" "Yellow"
+            Write-ColorOutput "Para ver logs de Redis:" "Cyan"
+            Write-ColorOutput "  docker logs accessibility-redis" "White"
+            Write-ColorOutput "  docker logs -f accessibility-redis  # Modo follow" "White"
         }
         elseif ($Service -eq 'all') {
             Write-ColorOutput "Mostrando logs de todos los servicios de monitoreo (últimas 50 líneas)..." "Yellow"
             docker compose -f $ComposeFile logs --tail=50 -f
-            Write-Host ""
-            Write-ColorOutput "💡 Para ver logs de Redis usa: -Service redis" "Cyan"
         }
         else {
             Write-ColorOutput "Mostrando logs de $Service (últimas 50 líneas)..." "Yellow"
@@ -599,17 +589,9 @@ switch ($Action) {
         Write-ColorOutput "  - Dashboards y configuración de Grafana" "Gray"
     }
     
-    'start-redis' {
-        Start-RedisContainer
-    }
-    
-    'stop-redis' {
-        Stop-RedisContainer
-    }
-    
-    'redis-status' {
-        Get-RedisStatus
-    }
+    # NOTA: Redis ahora es parte del stack de desarrollo (docker-compose.dev.yml)
+    # No es necesario tener comandos separados para gestionarlo aquí
+    # Para gestionar Redis, usar: docker-compose -f docker-compose.dev.yml up -d redis
     
     default {
         Write-ColorOutput "Acción no reconocida: $Action" "Red"
@@ -619,22 +601,18 @@ switch ($Action) {
         Write-Host "  stop          - Detener el stack"
         Write-Host "  restart       - Reiniciar servicios (especificar -Service o 'all')"
         Write-Host "  status        - Ver estado y alertas activas"
-        Write-Host "  logs          - Ver logs (especificar -Service: all, prometheus, alertmanager, grafana, redis)"
+        Write-Host "  logs          - Ver logs (especificar -Service: all, prometheus, alertmanager, grafana)"
         Write-Host "  test-alerts   - Probar configuración de alertas"
         Write-Host "  validate      - Validar archivos de configuración"
         Write-Host "  clean         - Detener y eliminar todos los volúmenes"
-        Write-Host ""
-        Write-Host "  start-redis   - Iniciar contenedor Redis para tests (puerto 6379)"
-        Write-Host "  stop-redis    - Detener y eliminar contenedor Redis"
-        Write-Host "  redis-status  - Ver estado del contenedor Redis"
-        Write-Host "`nServicios disponibles para logs/restart: prometheus, alertmanager, grafana, redis, all"
+        Write-Host "`nServicios disponibles para logs/restart: prometheus, alertmanager, grafana, all"
         Write-Host "`nEjemplos:"
         Write-Host "  .\manage-monitoring.ps1 -Action start"
         Write-Host "  .\manage-monitoring.ps1 -Action restart -Service alertmanager"
         Write-Host "  .\manage-monitoring.ps1 -Action logs -Service prometheus"
-        Write-Host "  .\manage-monitoring.ps1 -Action logs -Service redis"
-        Write-Host "  .\manage-monitoring.ps1 -Action start-redis"
-        Write-Host "  .\manage-monitoring.ps1 -Action redis-status"
+        Write-Host ""
+        Write-Host "📝 NOTA: Redis es parte del stack de desarrollo (docker-compose.dev.yml)"
+        Write-Host "   Para gestionar Redis: docker-compose -f docker-compose.dev.yml up -d redis"
         exit 1
     }
 }

@@ -14,20 +14,25 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - DOTNET_USE_POLLING_FILE_WATCHER=true
       - DOTNET_RUNNING_IN_CONTAINER=true
+      - Gate__Secret=VGhpc0lzQVNlY3JldEtleUZvckdhdGV3YXkyMDI0
       - Gate__Services__users=http://msusers-api:8081
       - Gate__Services__reports=http://msreports-api:8083
       - Gate__Services__analysis=http://msanalysis-api:8082
       - Gate__Services__middleware=http://accessibility-mw:3001
-      - Redis__ConnectionString=accessibility-redis-dev:6379
+      - Jwt__SecretKey=9b3e7ER@S^glvxPWKX8nN?DTqtrd%Yj!oVIfh+BG&piHwZz6ky4Q52MumOFA-Lc0
+      - Jwt__Issuer=https://accessibility.company.com
+      - Jwt__Audience=https://accessibility.company.com
+      - Jwt__ValidateIssuer=false
+      - Jwt__ValidateAudience=false
+      - Redis__ConnectionString=accessibility-redis:6379
       - Jwt__Authority=https://localhost:8100
-      - Jwt__Audience=accessibility-gateway
       - Gate__DefaultTimeoutSeconds=30
       - Gate__EnableDetailedErrors=true
       - Logging__LogLevel__Default=Information
       - Logging__LogLevel__Microsoft=Warning
       - Logging__LogLevel__System=Warning
     depends_on:
-      redis-dev:
+      redis:
         condition: service_healthy
     volumes:
       - gateway-dev-logs:/app/logs
@@ -55,13 +60,13 @@ services:
           cpus: "0.5"
           memory: 512M
 
-  redis-dev:
+  redis:
     image: redis:7.2-alpine
-    container_name: accessibility-redis-dev
+    container_name: accessibility-redis
     ports:
-      - "6380:6379" # Puerto diferente para evitar conflictos
+      - "6379:6379" # Puerto estándar de Redis
     volumes:
-      - redis-dev-data:/data
+      - redis-data:/data
       - /etc/localtime:/etc/localtime:ro
     networks:
       - accessibility-shared
@@ -111,9 +116,9 @@ volumes:
   gateway-dev-logs:
     driver: local
     name: accessibility-gateway-dev-logs
-  redis-dev-data:
+  redis-data:
     driver: local
-    name: accessibility-redis-dev-data
+    name: accessibility-redis-data
 
 networks:
   accessibility-shared:
