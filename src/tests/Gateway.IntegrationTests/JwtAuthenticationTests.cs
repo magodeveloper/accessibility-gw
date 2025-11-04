@@ -77,9 +77,10 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         var response = await client.GetAsync("/api/v1/services/users");
 
         // Assert
-        // Puede ser 401 (sin auth), 200 (público), 404 (no existe), o 502/503 (backend no disponible)
+        // Puede ser 401 (sin auth), 403 (no en AllowedRoutes), 200 (público), 404 (no existe), o 502/503 (backend no disponible)
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Unauthorized,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.OK,
             HttpStatusCode.NotFound,
             HttpStatusCode.BadGateway,
@@ -103,6 +104,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         // Assert
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Unauthorized,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.OK,
             HttpStatusCode.NotFound,
             HttpStatusCode.BadGateway,
@@ -122,9 +124,10 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         var response = await client.GetAsync("/api/v1/services/users");
 
         // Assert
-        // Con token válido, debería tener acceso
+        // Con token válido, debería tener acceso o 403 si no está en AllowedRoutes
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.OK,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.NotFound,
             HttpStatusCode.BadGateway,
             HttpStatusCode.ServiceUnavailable); // Endpoint puede no existir o backend no disponible
@@ -166,6 +169,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         // Assert
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Unauthorized,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.OK,
             HttpStatusCode.NotFound,
             HttpStatusCode.BadGateway,
@@ -204,6 +208,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         // Assert
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Unauthorized,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.OK,
             HttpStatusCode.NotFound,
             HttpStatusCode.BadGateway,
@@ -242,6 +247,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         // Assert
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Unauthorized,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.OK,
             HttpStatusCode.NotFound,
             HttpStatusCode.BadGateway,
@@ -280,6 +286,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         // Assert
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Unauthorized,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.OK,
             HttpStatusCode.NotFound,
             HttpStatusCode.BadGateway,
@@ -324,6 +331,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         // Assert
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.OK,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.NotFound,
             HttpStatusCode.BadGateway,
             HttpStatusCode.ServiceUnavailable);
@@ -361,6 +369,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtTestFactory>
         // Assert
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.OK,
+            HttpStatusCode.Forbidden,
             HttpStatusCode.NotFound,
             HttpStatusCode.Unauthorized,
             HttpStatusCode.BadGateway,

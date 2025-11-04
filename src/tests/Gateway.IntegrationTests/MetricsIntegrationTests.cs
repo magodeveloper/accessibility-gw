@@ -118,7 +118,8 @@ public class MetricsIntegrationTests : IClassFixture<WebApplicationFactory<Progr
         var response = await _client.GetAsync(endpoint);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        // Puede ser 403 (no en AllowedRoutes) o 404 (no encontrada)
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.Forbidden);
 
         // El endpoint puede no devolver contenido para 404
         // Pero el status code es lo importante

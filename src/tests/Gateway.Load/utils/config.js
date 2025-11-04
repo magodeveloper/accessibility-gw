@@ -187,3 +187,79 @@ export function getThresholdsForLevel(level) {
         iterations: ['count>0']
     };
 }
+
+// Función para obtener stages de carga según el nivel y modo
+export function getStagesForLevel(level, isSimpleMode = false) {
+    const stages = {
+        light: {
+            simple: [
+                { duration: '10s', target: 5 },
+                { duration: '20s', target: 20 },
+                { duration: '60s', target: 20 },
+                { duration: '10s', target: 0 }
+            ],
+            full: [
+                { duration: '30s', target: 5 },
+                { duration: '1m', target: 20 },
+                { duration: '3m', target: 20 },
+                { duration: '30s', target: 0 }
+            ]
+        },
+        medium: {
+            simple: [
+                { duration: '15s', target: 15 },
+                { duration: '15s', target: 30 },
+                { duration: '15s', target: 50 },
+                { duration: '90s', target: 50 },
+                { duration: '15s', target: 0 }
+            ],
+            full: [
+                { duration: '1m', target: 15 },
+                { duration: '1m', target: 30 },
+                { duration: '1m', target: 50 },
+                { duration: '5m', target: 50 },
+                { duration: '1m', target: 25 },
+                { duration: '30s', target: 0 }
+            ]
+        },
+        high: {
+            simple: [
+                { duration: '20s', target: 25 },
+                { duration: '20s', target: 50 },
+                { duration: '20s', target: 100 },
+                { duration: '120s', target: 100 },
+                { duration: '20s', target: 0 }
+            ],
+            full: [
+                { duration: '2m', target: 25 },
+                { duration: '2m', target: 50 },
+                { duration: '2m', target: 75 },
+                { duration: '2m', target: 100 },
+                { duration: '10m', target: 100 },
+                { duration: '2m', target: 50 },
+                { duration: '1m', target: 0 }
+            ]
+        },
+        extreme: {
+            simple: [
+                { duration: '30s', target: 100 },
+                { duration: '30s', target: 250 },
+                { duration: '30s', target: 500 },
+                { duration: '180s', target: 500 },
+                { duration: '30s', target: 0 }
+            ],
+            full: [
+                { duration: '3m', target: 100 },
+                { duration: '3m', target: 200 },
+                { duration: '3m', target: 350 },
+                { duration: '3m', target: 500 },
+                { duration: '15m', target: 500 },
+                { duration: '3m', target: 250 },
+                { duration: '2m', target: 0 }
+            ]
+        }
+    };
+
+    const mode = isSimpleMode ? 'simple' : 'full';
+    return stages[level]?.[mode] || stages.light.full;
+}

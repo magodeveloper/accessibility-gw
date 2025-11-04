@@ -111,8 +111,8 @@ namespace Gateway.UnitTests
             var response = await _client.GetAsync("/api/nonapi/something");
 
             // Assert
-            // Rutas que no coinciden con ningún patrón válido deben retornar 404
-            response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            // Rutas que no están configuradas en AllowedRoutes retornan 403 (default deny por seguridad)
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         }
 
         [Fact]
@@ -189,9 +189,9 @@ namespace Gateway.UnitTests
             var response = await _client.GetAsync("/api/unknown/endpoint");
 
             // Assert
-            // Rutas API desconocidas no deben ser mapeadas a ningún servicio
-            // Deberían pasar al siguiente middleware y eventualmente retornar 404
-            response.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.BadGateway);
+            // Rutas API desconocidas no están configuradas en AllowedRoutes
+            // Por seguridad (default deny), retornan 403 Forbidden
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         }
 
         [Fact]

@@ -2,6 +2,7 @@ using Polly;
 using Serilog;
 using Gateway;
 using System.Net;
+using Prometheus;
 using Gateway.Models;
 using Gateway.Services;
 using Gateway.Middleware;
@@ -125,23 +126,29 @@ builder.Services.AddSwaggerGen(c =>
 
 // --- Autenticación JWT ---
 var jwtSection = builder.Configuration.GetSection("Jwt");
-var authority = jwtSection["Authority"];
+var secretKey = jwtSection["SecretKey"];
+var issuer = jwtSection["Issuer"];
 var audience = jwtSection["Audience"];
 
-if (!string.IsNullOrWhiteSpace(authority))
+if (!string.IsNullOrWhiteSpace(secretKey))
 {
+    var key = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+        System.Text.Encoding.UTF8.GetBytes(secretKey));
+
     builder.Services.AddAuthentication("Bearer")
         .AddJwtBearer("Bearer", opt =>
         {
-            opt.Authority = authority;
-            opt.Audience = audience;
             opt.RequireHttpsMetadata = builder.Environment.IsProduction();
+            opt.SaveToken = true;
             opt.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
             {
-                ValidateIssuer = jwtSection.GetValue<bool>("ValidateIssuer", true),
-                ValidateAudience = jwtSection.GetValue<bool>("ValidateAudience", true),
-                ValidateLifetime = jwtSection.GetValue<bool>("ValidateLifetime", true),
                 ValidateIssuerSigningKey = jwtSection.GetValue<bool>("ValidateIssuerSigningKey", true),
+                IssuerSigningKey = key,
+                ValidateIssuer = jwtSection.GetValue<bool>("ValidateIssuer", false),
+                ValidIssuer = issuer,
+                ValidateAudience = jwtSection.GetValue<bool>("ValidateAudience", false),
+                ValidAudience = audience,
+                ValidateLifetime = jwtSection.GetValue<bool>("ValidateLifetime", true),
                 ClockSkew = TimeSpan.FromMinutes(1)
             };
         });
@@ -379,14 +386,24 @@ app.MapGet("/swagger", () => Results.Redirect("/swagger/index.html", true));
 // app.UseHttpsRedirection();
 app.UseCors("AllowedOrigins");
 
-if (!string.IsNullOrWhiteSpace(authority))
+// --- Prometheus Metrics ---
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+{
+    // Usar middleware de Prometheus para métricas HTTP
+    app.UseHttpMetrics(options =>
+    {
+        options.AddCustomLabel("host", context => context.Request.Host.Host);
+    });
+}
+
+if (!string.IsNullOrWhiteSpace(secretKey))
 {
     app.UseAuthentication();
 }
 
 app.UseMiddleware<RouteAuthorizationMiddleware>();
 
-if (!string.IsNullOrWhiteSpace(authority))
+if (!string.IsNullOrWhiteSpace(secretKey))
 {
     app.UseAuthorization();
     app.UseMiddleware<JwtClaimsTransformMiddleware>();
@@ -723,16 +740,23 @@ app.MapGet("/health/ready", async (IServiceProvider sp) =>
 .WithTags("Health");
 
 // --- Métricas ---
-app.MapGet("/metrics", ([FromServices] IMetricsService metricsService) =>
+// Métricas personalizadas del gateway (JSON)
+app.MapGet("/metrics/gateway", ([FromServices] IMetricsService metricsService) =>
 {
     var metrics = metricsService.GetMetrics();
     return Results.Ok(metrics);
 })
 .WithName("GetMetrics")
-.WithSummary("Métricas del gateway")
-.WithDescription("Obtiene las métricas de rendimiento y uso del gateway")
+.WithSummary("Métricas del gateway (JSON)")
+.WithDescription("Obtiene las métricas de rendimiento y uso del gateway en formato JSON")
 .WithTags("Metrics")
 .CacheOutput();
+
+// --- Prometheus Metrics Endpoint ---
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+{
+    app.MapMetrics(); // Endpoint /metrics para Prometheus (formato estándar)
+}
 
 app.MapPost("/metrics/reset", ([FromServices] IMetricsService metricsService) =>
 {

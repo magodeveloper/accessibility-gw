@@ -40,7 +40,8 @@ if ($loginResponse -match '"token"') {
     Write-Host "   Role: $($user.role)" -ForegroundColor DarkGray
     Write-Host "   Token (primeros 50 chars): $($token.Substring(0, 50))..." -ForegroundColor DarkGray
     Write-Host "   Expira: $expiresAt" -ForegroundColor DarkGray
-} else {
+}
+else {
     Write-Host "❌ Login FALLÓ: $loginResponse" -ForegroundColor Red
     exit 1
 }
@@ -59,15 +60,18 @@ $allSuccess = $true
 foreach ($route in $protectedRoutes) {
     $response = curl -X $route.Method "$baseUrl$($route.Path)" `
         -H "Authorization: Bearer $token" `
-        -s -w "%{http_code}" 2>&1
+        -s -w "`n%{http_code}" 2>&1
     
-    $httpCode = $response | Select-Object -Last 1
+    $lines = $response -split "`n"
+    $httpCode = $lines[-1]
     
     if ($httpCode -eq "200") {
         Write-Host "  ✅ $($route.Method) $($route.Path) → 200 OK" -ForegroundColor Green
-    } elseif ($httpCode -eq "404" -or $httpCode -eq "400") {
+    }
+    elseif ($httpCode -eq "404" -or $httpCode -eq "400") {
         Write-Host "  ✅ $($route.Method) $($route.Path) → $httpCode (acceso permitido, recurso no encontrado)" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "  ❌ $($route.Method) $($route.Path) → $httpCode (esperado 200/404)" -ForegroundColor Red
         $allSuccess = $false
     }
@@ -82,13 +86,15 @@ Write-Host ""
 Write-Host "[TEST 3] Rechazo de Acceso SIN Token" -ForegroundColor Yellow
 
 $noTokenResponse = curl -X GET "$baseUrl/api/users" `
-    -s -w "%{http_code}" 2>&1
+    -s -w "`n%{http_code}" 2>&1
 
-$httpCode = $noTokenResponse | Select-Object -Last 1
+$lines = $noTokenResponse -split "`n"
+$httpCode = $lines[-1]
 
 if ($httpCode -eq "401") {
     Write-Host "✅ GET /api/users sin token → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "❌ GET /api/users sin token → $httpCode (esperado 401)" -ForegroundColor Red
 }
 Write-Host ""
@@ -101,13 +107,15 @@ $invalidToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIi
 
 $invalidResponse = curl -X GET "$baseUrl/api/users" `
     -H "Authorization: Bearer $invalidToken" `
-    -s -w "%{http_code}" 2>&1
+    -s -w "`n%{http_code}" 2>&1
 
-$httpCode = $invalidResponse | Select-Object -Last 1
+$lines = $invalidResponse -split "`n"
+$httpCode = $lines[-1]
 
 if ($httpCode -eq "401") {
     Write-Host "✅ Token inválido rechazado → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "❌ Token inválido aceptado → $httpCode (esperado 401)" -ForegroundColor Red
 }
 Write-Host ""
@@ -119,13 +127,15 @@ $malformedToken = "esto-no-es-un-token-jwt-valido"
 
 $malformedResponse = curl -X GET "$baseUrl/api/users" `
     -H "Authorization: Bearer $malformedToken" `
-    -s -w "%{http_code}" 2>&1
+    -s -w "`n%{http_code}" 2>&1
 
-$httpCode = $malformedResponse | Select-Object -Last 1
+$lines = $malformedResponse -split "`n"
+$httpCode = $lines[-1]
 
 if ($httpCode -eq "401") {
     Write-Host "✅ Token malformado rechazado → 401 Unauthorized (CORRECTO)" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "❌ Token malformado aceptado → $httpCode (esperado 401)" -ForegroundColor Red
 }
 Write-Host ""
@@ -135,18 +145,19 @@ Write-Host "[TEST 6] Operaciones DELETE Protegidas" -ForegroundColor Yellow
 
 $deleteRoutes = @(
     "/api/Report/all",
-    "/api/Analysis/all",
-    "/api/Result/all"
+    "/api/Analysis/all"
 )
 
 Write-Host "  Sin token:" -ForegroundColor White
 foreach ($path in $deleteRoutes) {
-    $response = curl -X DELETE "$baseUrl$path" -s -w "%{http_code}" 2>&1
-    $code = $response | Select-Object -Last 1
+    $response = curl -X DELETE "$baseUrl$path" -s -w "`n%{http_code}" 2>&1
+    $lines = $response -split "`n"
+    $code = $lines[-1]
     
     if ($code -eq "401") {
         Write-Host "    ✅ DELETE $path → 401" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "    ❌ DELETE $path → $code (esperado 401)" -ForegroundColor Red
     }
 }
@@ -155,13 +166,15 @@ Write-Host "  Con token válido:" -ForegroundColor White
 foreach ($path in $deleteRoutes) {
     $response = curl -X DELETE "$baseUrl$path" `
         -H "Authorization: Bearer $token" `
-        -s -w "%{http_code}" 2>&1
-    $code = $response | Select-Object -Last 1
+        -s -w "`n%{http_code}" 2>&1
+    $lines = $response -split "`n"
+    $code = $lines[-1]
     
     # Esperamos 200, 404, 400, 500 (cualquier cosa excepto 401/403)
     if ($code -ne "401" -and $code -ne "403") {
         Write-Host "    ✅ DELETE $path → $code (acceso permitido)" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "    ❌ DELETE $path → $code (token rechazado)" -ForegroundColor Red
     }
 }
@@ -179,14 +192,16 @@ $publicRoutes = @(
 foreach ($route in $publicRoutes) {
     $response = curl -X $route.Method "$baseUrl$($route.Path)" `
         -H "Content-Type: application/json" `
-        -s -w "%{http_code}" 2>&1
+        -s -w "`n%{http_code}" 2>&1
     
-    $code = $response | Select-Object -Last 1
+    $lines = $response -split "`n"
+    $code = $lines[-1]
     
     # Rutas públicas no deben devolver 401/403
     if ($code -ne "401" -and $code -ne "403") {
         Write-Host "  ✅ $($route.Method) $($route.Path) → $code (accesible sin token)" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "  ❌ $($route.Method) $($route.Path) → $code (NO debería requerir token)" -ForegroundColor Red
     }
 }

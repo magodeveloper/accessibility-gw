@@ -116,7 +116,7 @@ scrape_configs:
   # ============================================
   - job_name: 'accessibility-middleware'
     static_configs:
-      - targets: ['accessibility-mw:3001']
+      - targets: ['host.docker.internal:3001']
         labels:
           service: 'middleware'
           component: 'analysis-engine'

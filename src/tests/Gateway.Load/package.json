@@ -1,7 +1,7 @@
 {
   "name": "accessibility-gateway-load-tests",
-  "version": "1.0.0",
-  "description": "K6 Load Tests for Accessibility Gateway",
+  "version": "2.0.0",
+  "description": "K6 Load Tests for Accessibility Gateway - Optimized Architecture",
   "scripts": {
     "test:smoke": "k6 run scenarios/smoke-test.js",
     "test:load": "k6 run scenarios/load-test.js",
@@ -9,20 +9,27 @@
     "test:spike": "k6 run scenarios/spike-test.js",
     "test:endurance": "k6 run scenarios/endurance-test.js",
     
-    "test:concurrent-20": "k6 run --env USERS=20 --env TEST_LEVEL=light --env SCENARIO_TYPE=full scenarios/concurrent-users-generic.js",
-    "test:concurrent-20-simple": "k6 run --env USERS=20 --env TEST_LEVEL=light --env SCENARIO_TYPE=simple scenarios/concurrent-users-generic.js",
-    "test:concurrent-50": "k6 run --env USERS=50 --env TEST_LEVEL=medium --env SCENARIO_TYPE=full scenarios/concurrent-users-generic.js",
-    "test:concurrent-50-simple": "k6 run --env USERS=50 --env TEST_LEVEL=medium --env SCENARIO_TYPE=simple scenarios/concurrent-users-generic.js",
-    "test:concurrent-100": "k6 run --env USERS=100 --env TEST_LEVEL=high --env SCENARIO_TYPE=full scenarios/concurrent-users-generic.js",
-    "test:concurrent-100-simple": "k6 run --env USERS=100 --env TEST_LEVEL=high --env SCENARIO_TYPE=simple scenarios/concurrent-users-generic.js",
-    "test:concurrent-500": "k6 run --env USERS=500 --env TEST_LEVEL=extreme --env SCENARIO_TYPE=full scenarios/concurrent-users-generic.js",
-    "test:concurrent-500-simple": "k6 run --env USERS=500 --env TEST_LEVEL=extreme --env SCENARIO_TYPE=simple scenarios/concurrent-users-generic.js",
+    "test:concurrent-light": "k6 run --env USERS=20 --env TEST_LEVEL=light --env TEST_MODE=full scenarios/concurrent-users.js",
+    "test:concurrent-light-simple": "k6 run --env USERS=20 --env TEST_LEVEL=light --env TEST_MODE=simple scenarios/concurrent-users.js",
     
-    "test:all": "npm run test:smoke && npm run test:load && npm run test:stress",
-    "test:concurrent-all": "npm run test:concurrent-20 && npm run test:concurrent-50 && npm run test:concurrent-100",
-    "test:concurrent-all-simple": "npm run test:concurrent-20-simple && npm run test:concurrent-50-simple && npm run test:concurrent-100-simple",
+    "test:concurrent-medium": "k6 run --env USERS=50 --env TEST_LEVEL=medium --env TEST_MODE=full scenarios/concurrent-users.js",
+    "test:concurrent-medium-simple": "k6 run --env USERS=50 --env TEST_LEVEL=medium --env TEST_MODE=simple scenarios/concurrent-users.js",
     
-    "report": "k6 run --out json=results.json scenarios/load-test.js && node utils/generate-report.js"
+    "test:concurrent-high": "k6 run --env USERS=100 --env TEST_LEVEL=high --env TEST_MODE=full scenarios/concurrent-users.js",
+    "test:concurrent-high-simple": "k6 run --env USERS=100 --env TEST_LEVEL=high --env TEST_MODE=simple scenarios/concurrent-users.js",
+    
+    "test:concurrent-extreme": "k6 run --env USERS=500 --env TEST_LEVEL=extreme --env TEST_MODE=full scenarios/concurrent-users.js",
+    "test:concurrent-extreme-simple": "k6 run --env USERS=500 --env TEST_LEVEL=extreme --env TEST_MODE=simple scenarios/concurrent-users.js",
+    
+    "test:concurrent-all": "npm run test:concurrent-light && npm run test:concurrent-medium && npm run test:concurrent-high",
+    "test:concurrent-all-simple": "npm run test:concurrent-light-simple && npm run test:concurrent-medium-simple && npm run test:concurrent-high-simple",
+    
+    "test:all-classic": "npm run test:smoke && npm run test:load && npm run test:stress",
+    "test:all": "pwsh -File run-k6-tests.ps1 -Action run -Level all -Mode full",
+    "test:all-simple": "pwsh -File run-k6-tests.ps1 -Action run -Level all -Mode simple",
+    
+    "clean": "pwsh -File run-k6-tests.ps1 -Action clean -Days 7",
+    "help": "pwsh -File run-k6-tests.ps1 -Action help"
   },
   "devDependencies": {
     "k6": "^0.47.0"
@@ -32,6 +39,10 @@
     "load-testing",
     "performance",
     "gateway",
-    "accessibility"
-  ]
+    "accessibility",
+    "concurrent-users",
+    "stress-testing"
+  ],
+  "author": "Accessibility Team",
+  "license": "UNLICENSED"
 }

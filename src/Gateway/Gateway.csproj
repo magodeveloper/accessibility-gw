@@ -4,6 +4,9 @@
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Deshabilitar advertencia IDE0005: Using directive is unnecessary -->
+        <NoWarn>$(NoWarn);IDE0005</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

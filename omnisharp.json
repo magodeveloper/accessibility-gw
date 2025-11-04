@@ -1,0 +1,19 @@
+{
+  "RoslynExtensionsOptions": {
+    "enableAnalyzersSupport": true,
+    "enableImportCompletion": true,
+    "enableDecompilationSupport": true
+  },
+  "FormattingOptions": {
+    "enableEditorConfigSupport": true,
+    "organizeImports": false
+  },
+  "fileOptions": {
+    "systemExcludeSearchPatterns": [
+      "**/node_modules/**/*",
+      "**/bin/**/*",
+      "**/obj/**/*",
+      "**/.git/**/*"
+    ]
+  }
+}

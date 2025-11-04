@@ -203,9 +203,16 @@ namespace Gateway.UnitTests
             var content = await response.Content.ReadAsStringAsync();
             content.Should().NotBeNullOrEmpty();
 
-            // Verificar que es JSON válido
-            var metrics = JsonSerializer.Deserialize<JsonElement>(content);
-            metrics.ValueKind.Should().Be(JsonValueKind.Object);
+            // Verificar que es formato Prometheus (comienza con # para comentarios)
+            // El formato Prometheus es texto plano, no JSON
+            content.Should().Contain("#");
+
+            // Verificar el content type correcto para métricas de Prometheus
+            response.Content.Headers.ContentType?.MediaType.Should().BeOneOf(
+                "text/plain",
+                "application/openmetrics-text",
+                null // A veces no se especifica el content type
+            );
         }
 
         [Fact]
@@ -245,8 +252,8 @@ namespace Gateway.UnitTests
             // Act
             var response = await _client.PostAsJsonAsync("/api/v1/translate", invalidRequest);
 
-            // Assert - Ahora esperamos 404 porque el servicio no está configurado
-            response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            // Assert - Esperamos 403 porque la ruta no está configurada en AllowedRoutes (seguridad por defecto)
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         }
 
         [Fact]

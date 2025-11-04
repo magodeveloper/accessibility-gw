@@ -396,8 +396,16 @@ function Get-K6LoadTestResults {
             
             if (Test-Path $filePath) {
                 try {
-                    $content = Get-Content $filePath | ConvertFrom-Json
-                    $metrics = $content.metrics
+                    # K6 genera NDJSON (una línea JSON por métrica)
+                    # Necesitamos encontrar la línea final que contiene el resumen
+                    $lines = Get-Content $filePath
+                    $metricsLine = $lines | Where-Object { $_ -match '"type":"Point"' -and $_ -match '"metric":"http_reqs"' } | Select-Object -Last 1
+                    
+                    if (-not $metricsLine) {
+                        throw "No se encontraron métricas en el archivo"
+                    }
+                    
+                    $content = $metricsLine | ConvertFrom-Json
                     
                     # Mapear usuarios según el test
                     $userCount = switch ($testName) {
@@ -407,37 +415,66 @@ function Get-K6LoadTestResults {
                         "extreme-load" { 500 }
                     }
                     
-                    # Calcular error rate
-                    $totalRequests = $metrics.http_reqs.count
-                    $failedRequests = if ($metrics.http_req_failed.count) { $metrics.http_req_failed.count } else { 0 }
-                    $errorRate = if ($totalRequests -gt 0) { [math]::Round(($failedRequests / $totalRequests) * 100, 2) } else { 0 }
+                    # Buscar todas las métricas relevantes
+                    $httpReqs = $lines | Where-Object { $_ -match '"metric":"http_reqs"' } | Select-Object -Last 1 | ConvertFrom-Json
+                    $httpDuration = $lines | Where-Object { $_ -match '"metric":"http_req_duration"' } | Select-Object -Last 1 | ConvertFrom-Json
+                    $httpFailed = $lines | Where-Object { $_ -match '"metric":"http_req_failed"' } | Select-Object -Last 1 | ConvertFrom-Json
+                    $iterations = $lines | Where-Object { $_ -match '"metric":"iterations"' } | Select-Object -Last 1 | ConvertFrom-Json
+                    
+                    # Extraer valores
+                    $totalRequests = if ($httpReqs.data.value) { $httpReqs.data.value } else { 0 }
+                    $reqRate = if ($totalRequests -gt 0 -and $httpReqs.data.time) { 
+                        [math]::Round($totalRequests / ($httpReqs.data.time / 1000000), 2)
+                    }
+                    else { 0 }
+                    
+                    $avgDuration = if ($httpDuration.data.value) { [math]::Round($httpDuration.data.value, 1) } else { 0 }
+                    $failedRate = if ($httpFailed.data.value) { [math]::Round($httpFailed.data.value * 100, 2) } else { 0 }
+                    $iterCount = if ($iterations.data.value) { $iterations.data.value } else { 0 }
                     
                     $k6Results[$testName] = @{
-                        Status     = if ($errorRate -lt 5) { "Success" } else { "Warning" }
+                        Status     = if ($failedRate -lt 5 -and $totalRequests -gt 0) { "Success" } 
+                        elseif ($totalRequests -gt 0) { "Warning" } 
+                        else { "Failed" }
                         Users      = $userCount
                         ExecutedAt = (Get-Item $filePath).LastWriteTime.ToString("HH:mm:ss")
                         Metrics    = @{
-                            RequestsPerSecond = [math]::Round($metrics.http_reqs.rate, 1).ToString()
-                            ResponseTimeAvg   = [math]::Round($metrics.http_req_duration.avg, 1).ToString() + "ms"
-                            ResponseTimeP95   = [math]::Round($metrics.http_req_duration.'p(95)', 1).ToString() + "ms"
-                            ResponseTimeP99   = [math]::Round($metrics.http_req_duration.'p(99)', 1).ToString() + "ms"
-                            ErrorRate         = $errorRate.ToString() + "%"
-                            Iterations        = $metrics.iterations.count.ToString()
+                            RequestsPerSecond = $reqRate.ToString()
+                            ResponseTimeAvg   = $avgDuration.ToString() + "ms"
+                            ResponseTimeP95   = "N/A"
+                            ResponseTimeP99   = "N/A"
+                            ErrorRate         = $failedRate.ToString() + "%"
+                            Iterations        = $iterCount.ToString()
                         }
                     }
                     
-                    if ($errorRate -lt 5) { $successfulTests++ }
+                    if ($failedRate -lt 5 -and $totalRequests -gt 0) { $successfulTests++ }
                     
-                    $reqPerSec = [math]::Round($metrics.http_reqs.rate, 1)
-                    $avgTime = [math]::Round($metrics.http_req_duration.avg, 1)
-                    Write-ColorMessage "  ✅ $testName`: $userCount usuarios, $reqPerSec req/s, ${avgTime}ms avg" $Colors.Success
+                    Write-ColorMessage "  ✅ $testName`: $userCount usuarios, $reqRate req/s, ${avgDuration}ms avg" $Colors.Success
                 }
                 catch {
                     Write-ColorMessage "⚠️ Error al procesar $testName`: $($_.Exception.Message)" $Colors.Warning
+                    
+                    # Mapear usuarios aunque falle
+                    $userCount = switch ($testName) {
+                        "light-load-k6" { 20 }
+                        "medium-load-k6" { 50 }
+                        "high-load" { 100 }
+                        "extreme-load" { 500 }
+                    }
+                    
                     $k6Results[$testName] = @{
-                        Status  = "Failed"
-                        Users   = 0
-                        Metrics = @{ RequestsPerSecond = "Error" }
+                        Status     = "Failed"
+                        Users      = $userCount
+                        ExecutedAt = (Get-Item $filePath).LastWriteTime.ToString("HH:mm:ss")
+                        Metrics    = @{ 
+                            RequestsPerSecond = "0"
+                            ResponseTimeAvg   = "0ms"
+                            ResponseTimeP95   = "N/A"
+                            ResponseTimeP99   = "N/A"
+                            ErrorRate         = "0%"
+                            Iterations        = "0"
+                        }
                     }
                 }
             }
@@ -874,6 +911,122 @@ function New-DashboardHtml {
                 font-size: 2.5em;
             }
         }
+
+        /* K6 Load Tests Styles */
+        .k6-section {
+            margin-top: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .section-title {
+            color: #2c3e50;
+            font-size: 2em;
+            margin-bottom: 25px;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 15px;
+        }
+
+        .k6-tests-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-top: 25px;
+        }
+
+        .k6-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-left: 5px solid #3498db;
+        }
+
+        .k6-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .k6-success {
+            border-left-color: #2ecc71;
+        }
+
+        .k6-warning {
+            border-left-color: #f39c12;
+        }
+
+        .k6-error {
+            border-left-color: #e74c3c;
+        }
+
+        .k6-notfound {
+            border-left-color: #95a5a6;
+        }
+
+        .k6-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 15px;
+        }
+
+        .k6-icon {
+            font-size: 2.5em;
+            margin-right: 15px;
+        }
+
+        .k6-header h3 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1.5em;
+        }
+
+        .k6-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .k6-metric {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .k6-label {
+            display: block;
+            font-size: 0.85em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .k6-value {
+            display: block;
+            font-size: 1.3em;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+
+        .k6-footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #ecf0f1;
+            text-align: center;
+            color: #95a5a6;
+        }
+
+        @media (max-width: 768px) {
+            .k6-tests-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -970,6 +1123,81 @@ function New-DashboardHtml {
                     <li>Dependency Injection</li>
                     <li>JWT Authentication</li>
                 </ul>
+            </div>
+        </div>
+
+        <!-- K6 Load Tests Section -->
+        <div class="k6-section">
+            <h2 class="section-title">⚡ Pruebas de Carga K6</h2>
+            <div class="k6-tests-grid">
+"@
+
+    # Generar tarjetas K6
+    if ($LoadTestData -and $LoadTestData.Available -and $LoadTestData.K6) {
+        foreach ($testName in @("light-load-k6", "medium-load-k6", "high-load", "extreme-load")) {
+            $test = $LoadTestData.K6[$testName]
+            if ($test) {
+                $statusClass = switch ($test.Status) {
+                    "Success" { "k6-success" }
+                    "Warning" { "k6-warning" }
+                    "Failed" { "k6-error" }
+                    default { "k6-notfound" }
+                }
+                
+                $statusIcon = switch ($test.Status) {
+                    "Success" { "✅" }
+                    "Warning" { "⚠️" }
+                    "Failed" { "❌" }
+                    default { "📄" }
+                }
+                
+                $html += @"
+                <div class="k6-card $statusClass">
+                    <div class="k6-header">
+                        <span class="k6-icon">$statusIcon</span>
+                        <h3>$($test.Users) Usuarios</h3>
+                    </div>
+                    <div class="k6-metrics">
+                        <div class="k6-metric">
+                            <span class="k6-label">Req/s</span>
+                            <span class="k6-value">$($test.Metrics.RequestsPerSecond)</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Tiempo Avg</span>
+                            <span class="k6-value">$($test.Metrics.ResponseTimeAvg)</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">P95</span>
+                            <span class="k6-value">$($test.Metrics.ResponseTimeP95)</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Error Rate</span>
+                            <span class="k6-value">$($test.Metrics.ErrorRate)</span>
+                        </div>
+                    </div>
+                    <div class="k6-footer">
+                        <small>Ejecutado: $($test.ExecutedAt)</small>
+                    </div>
+                </div>
+"@
+            }
+        }
+    }
+    else {
+        $html += @"
+                <div class="k6-card k6-notfound">
+                    <div class="k6-header">
+                        <span class="k6-icon">📊</span>
+                        <h3>No hay resultados K6</h3>
+                    </div>
+                    <p style="padding: 20px; text-align: center;">
+                        Ejecuta: <code>cd src\tests\Gateway.Load; .\run-k6-tests.ps1</code>
+                    </p>
+                </div>
+"@
+    }
+
+    $html += @"
             </div>
         </div>
     </div>
@@ -1165,7 +1393,12 @@ PRUEBAS DE CARGA K6:
 "@ -ForegroundColor $Colors.Info
 
     Write-ColorMessage "🎯 Para empezar rápidamente, ejecute: .\manage-tests.ps1 full" $Colors.Highlight
-    Write-ColorMessage "⚡ Para ejecutar pruebas de carga K6, use: .\src\tests\Gateway.Load\manage-load-tests.ps1" $Colors.Info
+    Write-ColorMessage "" "" 
+    Write-ColorMessage "⚡ TESTS DE CARGA K6 (UN SOLO SCRIPT):" $Colors.Highlight
+    Write-ColorMessage "   cd src\tests\Gateway.Load" $Colors.Info
+    Write-ColorMessage "   .\run-k6-tests.ps1              # Ejecuta los 4 tests K6 (20, 50, 100, 500 usuarios)" $Colors.Success
+    Write-ColorMessage "   .\run-k6-tests.ps1 clean        # Limpia resultados antiguos (>7 días)" $Colors.Info
+    Write-ColorMessage "   Luego: cd ..\..\..; .\manage-tests.ps1 dashboard -OpenDashboard" $Colors.Info
 }
 
 #endregion

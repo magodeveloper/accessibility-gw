@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚪 Accessibility Gateway - Test Dashboard</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚪</text></svg>">
+    <title>👥 Gateway - Test Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👥</text></svg>">
     <style>
         * {
             margin: 0;
@@ -56,7 +56,6 @@
             font-size: 1.1em;
             background: linear-gradient(45deg, #2ecc71, #27ae60);
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
-            margin: 5px;
         }
 
         .status-badge.warning {
@@ -64,14 +63,9 @@
             box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
         }
 
-        .status-badge.danger {
-            background: linear-gradient(45deg, #e74c3c, #c0392b);
-            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
-        }
-
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -132,14 +126,6 @@
             justify-content: center;
         }
 
-        .progress-fill.warning {
-            background: linear-gradient(45deg, #f39c12, #e67e22);
-        }
-
-        .progress-fill.danger {
-            background: linear-gradient(45deg, #e74c3c, #c0392b);
-        }
-
         .progress-text {
             color: white;
             font-weight: bold;
@@ -148,7 +134,7 @@
 
         .details-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -160,10 +146,6 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
-        .detail-card.full-width {
-            grid-column: span 2;
-        }
-
         .detail-card h3 {
             color: #2c3e50;
             margin-bottom: 20px;
@@ -172,260 +154,81 @@
             padding-bottom: 8px;
         }
 
-        .load-results-summary {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border: 1px solid #dee2e6;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-
-        .load-results-header {
+        .assembly-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
+            padding: 12px 0;
+            border-bottom: 1px solid #ecf0f1;
         }
 
-        .load-results-header h4 {
-            color: #2c3e50;
-            margin: 0;
-            font-size: 1.4em;
+        .assembly-row:last-child {
+            border-bottom: none;
         }
 
-        .execution-time {
-            background: #3498db;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-
-        .load-results-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 15px;
-        }
-
-        .result-stat {
-            text-align: center;
-            padding: 15px;
-            border-radius: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .result-stat.success {
-            background: linear-gradient(135deg, #d5f4e6, #c8e6c9);
-            border: 2px solid #4caf50;
-        }
-
-        .result-stat.failed {
-            background: linear-gradient(135deg, #ffebee, #ffcdd2);
-            border: 2px solid #f44336;
-        }
-
-        .result-stat.total {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-            border: 2px solid #2196f3;
-        }
-
-        .stat-number {
-            font-size: 2.5em;
+        .assembly-name {
             font-weight: bold;
             color: #2c3e50;
         }
 
-        .stat-label {
-            font-size: 0.9em;
-            color: #6c757d;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        .assembly-coverage {
+            text-align: right;
         }
 
-        .tool-section {
-            margin-bottom: 30px;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        }
-
-        .k6-section {
-            border: 2px solid #1abc9c;
-        }
-
-        .tool-section-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 20px;
-            font-weight: bold;
-            color: white;
-        }
-
-        .k6-section .tool-section-header {
-            background: linear-gradient(135deg, #1abc9c, #16a085);
-        }
-
-        .tool-icon {
-            font-size: 1.8em;
-        }
-
-        .tool-section-header h4 {
-            margin: 0;
-            font-size: 1.3em;
-        }
-
-        .tool-badge {
-            padding: 5px 10px;
+        .coverage-badge {
+            display: inline-block;
+            padding: 5px 12px;
             border-radius: 15px;
             color: white;
-            font-size: 0.8em;
             font-weight: bold;
+            margin-bottom: 3px;
         }
 
-        .tool-k6 {
-            background: #1abc9c;
+        .coverage-excellent {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
         }
 
-        .tool-results-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            padding: 20px;
-            background: #f8f9fa;
-            max-width: 100%;
+        .coverage-good {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
         }
 
-        /* Responsive para 4 columnas */
-        @media (max-width: 1400px) {
-            .tool-results-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 18px;
-            }
+        .coverage-poor {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
         }
 
-        @media (max-width: 768px) {
-            .tool-results-grid {
-                grid-template-columns: 1fr;
-                gap: 16px;
-                padding: 15px;
-            }
+        .test-list {
+            margin-top: 10px;
         }
 
-        .load-result-card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid #dee2e6;
-            transition: all 0.3s ease;
-            min-width: 0; /* Permite que las cards se contraigan */
-            font-size: 0.9em; /* Texto ligeramente más pequeño para 4 columnas */
-        }
-
-        .load-result-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        }
-
-        .load-result-card.status-success {
-            border-left: 5px solid #4caf50;
-        }
-
-        .load-result-card.status-failed {
-            border-left: 5px solid #f44336;
-        }
-
-        .result-header {
+        .test-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f1f1;
         }
 
-        .result-title {
-            font-weight: bold;
-            color: #2c3e50;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.95em;
+        .test-item:last-child {
+            border-bottom: none;
         }
 
-        .users-count {
-            background: #3498db;
-            color: white;
-            padding: 3px 6px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: bold;
+        .test-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
         }
 
-        .result-status {
-            padding: 4px 8px;
-            border-radius: 16px;
-            font-size: 0.75em;
-            font-weight: bold;
+        .test-pass {
+            background: #2ecc71;
         }
 
-        .status-success .result-status {
-            background: #d5f4e6;
-            color: #2e7d32;
+        .test-fail {
+            background: #e74c3c;
         }
 
-        .status-failed .result-status {
-            background: #ffebee;
-            color: #c62828;
-        }
-
-        .result-metrics {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .metric-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border-left: 3px solid #3498db;
-        }
-
-        .metric-label {
-            font-weight: 600;
-            color: #495057;
-            font-size: 0.8em;
-        }
-
-        .metric-value {
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            color: #2c3e50;
-            background: #e3f2fd;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.75em;
-        }
-
-        .result-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 8px;
-            border-top: 1px solid #eee;
-            font-size: 0.75em;
-            color: #6c757d;
+        .test-warning {
+            background: #f39c12;
         }
 
         .timestamp {
@@ -455,16 +258,54 @@
             box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
         }
 
+        /* Test Stats Flexbox */
+        .test-stats-flex {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        .stat-number-success {
+            color: #2ecc71;
+            font-size: 1.4em;
+        }
+
+        .stat-number-danger {
+            color: #e74c3c;
+            font-size: 1.4em;
+        }
+
+        .stat-number-warning {
+            color: #f39c12;
+            font-size: 1.4em;
+        }
+
+        /* List Styles */
+        .tech-list {
+            line-height: 1.8;
+        }
+
+        .arch-list {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+
+        /* Assembly Excluded */
+        .assembly-excluded {
+            background: #e8f5e8;
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .coverage-excluded {
+            background: #95a5a6;
+        }
+
         /* Responsive Design */
-        @media (max-width: 1024px) {
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        @media (max-width: 1024px) and (min-width: 769px) {
+            .stats-grid,
             .details-grid {
-                grid-template-columns: 1fr;
-            }
-            .detail-card.full-width {
-                grid-column: span 1;
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -472,14 +313,134 @@
             .container-fluid {
                 padding: 15px;
             }
-            .stats-grid {
+
+            .stats-grid,
+            .details-grid {
                 grid-template-columns: 1fr;
             }
+
             .header h1 {
                 font-size: 2em;
             }
+
             .big-number {
                 font-size: 2.5em;
+            }
+        }
+
+        /* K6 Load Tests Styles */
+        .k6-section {
+            margin-top: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .section-title {
+            color: #2c3e50;
+            font-size: 2em;
+            margin-bottom: 25px;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 15px;
+        }
+
+        .k6-tests-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-top: 25px;
+        }
+
+        .k6-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-left: 5px solid #3498db;
+        }
+
+        .k6-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .k6-success {
+            border-left-color: #2ecc71;
+        }
+
+        .k6-warning {
+            border-left-color: #f39c12;
+        }
+
+        .k6-error {
+            border-left-color: #e74c3c;
+        }
+
+        .k6-notfound {
+            border-left-color: #95a5a6;
+        }
+
+        .k6-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 15px;
+        }
+
+        .k6-icon {
+            font-size: 2.5em;
+            margin-right: 15px;
+        }
+
+        .k6-header h3 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1.5em;
+        }
+
+        .k6-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .k6-metric {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .k6-label {
+            display: block;
+            font-size: 0.85em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .k6-value {
+            display: block;
+            font-size: 1.3em;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+
+        .k6-footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #ecf0f1;
+            text-align: center;
+            color: #95a5a6;
+        }
+
+        @media (max-width: 768px) {
+            .k6-tests-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -489,267 +450,211 @@
     <div class="container-fluid">
         <!-- Header -->
         <div class="header">
-            <h1>🚪 Accessibility Gateway</h1>
-            <p class="subtitle">Dashboard Comprehensivo de Tests - Middleware de Accesibilidad</p>
-            <div class="status-badge ">
-                ✅ 528/528 TESTS EXITOSOS
-            </div>
-            <div class="status-badge ">
-                📊 80.2% COBERTURA PROMEDIO
-            </div>
-            <div class="timestamp">Última actualización: 16 de septiembre 2025, 01:18</div>
+            <h1>🛡️ Gateway</h1>
+            <p class="subtitle">Dashboard de Cobertura de Tests - Clean Architecture</p>
+            <div class="status-badge warning">⚠️ 1345/1347 TESTS PASANDO - 2 FALLIDOS</div>
+            <div class="timestamp">Última actualización: 04 de noviembre 2025, 12:02</div>
         </div>
 
         <!-- Main Stats -->
         <div class="stats-grid">
             <div class="stat-card">
-                <h3>📝 Total Tests</h3>
-                <div class="big-number">528</div>
+                <h3>📊 Cobertura Total</h3>
+                <div class="big-number warning">55.11%</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: 100%">
-                        <span class="progress-text">Suites: 50</span>
+                    <div class="progress-fill" data-width="55.11%">
+                        <div class="progress-text">Mejorable</div>
+                    </div>
+                </div>
+                <p><strong>2099 de 3809</strong> líneas cubiertas</p>
+                <p><strong>0 de 0</strong> ramas cubiertas (68.05%)</p>
+            </div>
+
+            <div class="stat-card">
+                <h3>🧪 Tests Ejecutados</h3>
+                <div class="big-number">1347</div>
+                <div class="test-stats-flex">
+                    <div>
+                        <strong class="stat-number-success">1345</strong><br>
+                        <small>✅ Exitosos</small>
+                    </div>
+                    <div>
+                        <strong class="stat-number-danger">2</strong><br>
+                        <small>❌ Fallidos</small>
+                    </div>
+                    <div>
+                        <strong class="stat-number-success">99.9%</strong><br>
+                        <small>🎯 Tasa de éxito</small>
                     </div>
                 </div>
             </div>
 
             <div class="stat-card">
-                <h3>✅ Tests Exitosos</h3>
-                <div class="big-number">528</div>
+                <h3>⚡ Performance</h3>
+                <div class="big-number">127s</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: 100%">
-                        <span class="progress-text">100%</span>
+                    <div class="progress-fill" data-width="50%">
+                        <div class="progress-text">Lento</div>
                     </div>
                 </div>
-            </div>
-
-            <div class="stat-card">
-                <h3>❌ Tests Fallidos</h3>
-                <div class="big-number ">0</div>
-                <div class="progress-bar">
-                    <div class="progress-fill " style="width: 0%">
-                        <span class="progress-text">0%</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card">
-                <h3>📊 Cobertura Promedio</h3>
-                <div class="big-number ">80.2%</div>
-                <div class="progress-bar">
-                    <div class="progress-fill " style="width: 80.2%">
-                        <span class="progress-text">Objetivo: 80%</span>
-                    </div>
-                </div>
+                <p>Tiempo de ejecución para <strong>1347</strong> tests</p>
             </div>
         </div>
 
+        <!-- Assembly Details & Technical Details -->
         <div class="details-grid">
-            <div class="detail-card full-width">
-                <h3>K6 - Tests de Carga (20, 50, 100 y 500 usuarios)</h3>                <div class="load-results-summary">
-                    <div class="load-results-header">
-                        <h4>📊 Resumen de Ejecución</h4>
-                        <span class="execution-time">Última ejecución: 16/09/2025 01:17:47</span>
-                    </div>
-                    <div class="load-results-stats">
-                        <div class="result-stat success">
-                            <span class="stat-number">4</span>
-                            <span class="stat-label">Exitosos</span>
-                        </div>
-                        <div class="result-stat failed">
-                            <span class="stat-number">0</span>
-                            <span class="stat-label">Fallidos</span>
-                        </div>
-                        <div class="result-stat total">
-                            <span class="stat-number">4</span>
-                            <span class="stat-label">Total</span>
-                        </div>
+            <div class="detail-card">
+                <h3>🏗️ Coverage por Assembly</h3>
+                                <div class="assembly-row">
+                    <div class="assembly-name">Gateway</div>
+                    <div class="assembly-coverage">
+                        <div class="coverage-badge coverage-poor">55.1%</div>
+                        <small>2099/3809 líneas</small>
                     </div>
                 </div>
-
-                <!-- K6 Results Section -->
-                <div class="tool-section k6-section">
-                    <div class="tool-section-header">
-                        <span class="tool-icon">⚡</span>
-                        <h4>K6 - Tests de Carga (20, 50, 100 y 500 usuarios)</h4>
-                        <span class="tool-badge tool-k6">K6</span>
+                <div class="assembly-row assembly-excluded">
+                    <div class="assembly-name">✅ Users.Infrastructure</div>
+                    <div class="assembly-coverage">
+                        <div class="coverage-badge coverage-excluded">0% (excluido)</div>
+                        <small>Omitido del cálculo</small>
                     </div>
-                    <div class="tool-results-grid">                        <div class="load-result-card status-success">
-                            <div class="result-header">
-                                <div class="result-title">
-                                    ✅ light-load-k6
-                                    <span class="users-count">👥 20 usuarios</span>
-                                </div>
-                                <div class="result-status">Success</div>
-                            </div>                            <div class="result-metrics">
-                                <div class="metric-row">
-                                    <span class="metric-label">🚀 Requests/seg:</span>
-                                    <span class="metric-value">60</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">⏱️ Resp. Promedio:</span>
-                                    <span class="metric-value">85.2ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📊 P95:</span>
-                                    <span class="metric-value">125.4ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📈 P99:</span>
-                                    <span class="metric-value">180.7ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">❌ Tasa Error:</span>
-                                    <span class="metric-value">0.11%</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">🔄 Iteraciones:</span>
-                                    <span class="metric-value">600</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📤 Datos Enviados:</span>
-                                    <span class="metric-value">7.87 MB</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📥 Datos Recibidos:</span>
-                                    <span class="metric-value">17.58 MB</span>
-                                </div>
-                            </div>
-                            <div class="result-footer">
-                                <span class="execution-time">⏰ 00:52:20</span>
-                                <span class="duration">⏱️ 0.5 min</span>
-                            </div>                        </div>                        <div class="load-result-card status-success">
-                            <div class="result-header">
-                                <div class="result-title">
-                                    ✅ medium-load-k6
-                                    <span class="users-count">👥 50 usuarios</span>
-                                </div>
-                                <div class="result-status">Success</div>
-                            </div>                            <div class="result-metrics">
-                                <div class="metric-row">
-                                    <span class="metric-label">🚀 Requests/seg:</span>
-                                    <span class="metric-value">125</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">⏱️ Resp. Promedio:</span>
-                                    <span class="metric-value">118.4ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📊 P95:</span>
-                                    <span class="metric-value">195.3ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📈 P99:</span>
-                                    <span class="metric-value">285.6ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">❌ Tasa Error:</span>
-                                    <span class="metric-value">0.21%</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">🔄 Iteraciones:</span>
-                                    <span class="metric-value">1250</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📤 Datos Enviados:</span>
-                                    <span class="metric-value">16.4 MB</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📥 Datos Recibidos:</span>
-                                    <span class="metric-value">36.62 MB</span>
-                                </div>
-                            </div>
-                            <div class="result-footer">
-                                <span class="execution-time">⏰ 00:52:20</span>
-                                <span class="duration">⏱️ 0.5 min</span>
-                            </div>                        </div>                        <div class="load-result-card status-success">
-                            <div class="result-header">
-                                <div class="result-title">
-                                    ✅ high-load
-                                    <span class="users-count">👥 100 usuarios</span>
-                                </div>
-                                <div class="result-status">Success</div>
-                            </div>                            <div class="result-metrics">
-                                <div class="metric-row">
-                                    <span class="metric-label">🚀 Requests/seg:</span>
-                                    <span class="metric-value">210</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">⏱️ Resp. Promedio:</span>
-                                    <span class="metric-value">165.8ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📊 P95:</span>
-                                    <span class="metric-value">285.2ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📈 P99:</span>
-                                    <span class="metric-value">425.1ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">❌ Tasa Error:</span>
-                                    <span class="metric-value">0.51%</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">🔄 Iteraciones:</span>
-                                    <span class="metric-value">2100</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📤 Datos Enviados:</span>
-                                    <span class="metric-value">27.55 MB</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📥 Datos Recibidos:</span>
-                                    <span class="metric-value">61.52 MB</span>
-                                </div>
-                            </div>
-                            <div class="result-footer">
-                                <span class="execution-time">⏰ 00:52:20</span>
-                                <span class="duration">⏱️ 0.5 min</span>
-                            </div>                        </div>                        <div class="load-result-card status-success">
-                            <div class="result-header">
-                                <div class="result-title">
-                                    ✅ extreme-load
-                                    <span class="users-count">👥 500 usuarios</span>
-                                </div>
-                                <div class="result-status">Success</div>
-                            </div>                            <div class="result-metrics">
-                                <div class="metric-row">
-                                    <span class="metric-label">🚀 Requests/seg:</span>
-                                    <span class="metric-value">291.7</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">⏱️ Resp. Promedio:</span>
-                                    <span class="metric-value">895.4ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📊 P95:</span>
-                                    <span class="metric-value">1456.8ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📈 P99:</span>
-                                    <span class="metric-value">2145.2ms</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">❌ Tasa Error:</span>
-                                    <span class="metric-value">4.4%</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">🔄 Iteraciones:</span>
-                                    <span class="metric-value">2916</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📤 Datos Enviados:</span>
-                                    <span class="metric-value">38.27 MB</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">📥 Datos Recibidos:</span>
-                                    <span class="metric-value">85.45 MB</span>
-                                </div>
-                            </div>
-                            <div class="result-footer">
-                                <span class="execution-time">⏰ 00:52:20</span>
-                                <span class="duration">⏱️ 0.5 min</span>
-                            </div>                        </div>                    </div>
+                </div>
+            </div>
+            
+            <div class="detail-card">
+                <h3>⚙️ Configuración Técnica</h3>
+                <ul class="tech-list">
+                    <li><strong>Framework:</strong> .NET 9</li>
+                    <li><strong>Test Framework:</strong> xUnit</li>
+                    <li><strong>Mocking:</strong> Moq</li>
+                    <li><strong>Assertions:</strong> FluentAssertions</li>
+                    <li><strong>Coverage Tool:</strong> Coverlet + ReportGenerator</li>
+                    <li><strong>Database:</strong> MySQL (Production) / InMemory (Tests)</li>
+                    <li><strong>Architecture:</strong> Clean Architecture</li>
+                </ul>
+            </div>
+
+            <div class="detail-card">
+                <h3>📁 Arquitectura</h3>
+                <div class="big-number">.NET 9</div>
+                <p>Sistema construido con:</p>
+                <ul class="arch-list">
+                    <li>Entity Framework Core + MySQL</li>
+                    <li>xUnit + FluentAssertions</li>
+                    <li>Clean Architecture</li>
+                    <li>Dependency Injection</li>
+                    <li>JWT Authentication</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- K6 Load Tests Section -->
+        <div class="k6-section">
+            <h2 class="section-title">⚡ Pruebas de Carga K6</h2>
+            <div class="k6-tests-grid">                <div class="k6-card k6-error">
+                    <div class="k6-header">
+                        <span class="k6-icon">❌</span>
+                        <h3>20 Usuarios</h3>
+                    </div>
+                    <div class="k6-metrics">
+                        <div class="k6-metric">
+                            <span class="k6-label">Req/s</span>
+                            <span class="k6-value">0</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Tiempo Avg</span>
+                            <span class="k6-value">0ms</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">P95</span>
+                            <span class="k6-value">N/A</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Error Rate</span>
+                            <span class="k6-value">0%</span>
+                        </div>
+                    </div>
+                    <div class="k6-footer">
+                        <small>Ejecutado: 11:46:52</small>
+                    </div>
+                </div>                <div class="k6-card k6-error">
+                    <div class="k6-header">
+                        <span class="k6-icon">❌</span>
+                        <h3>50 Usuarios</h3>
+                    </div>
+                    <div class="k6-metrics">
+                        <div class="k6-metric">
+                            <span class="k6-label">Req/s</span>
+                            <span class="k6-value">0</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Tiempo Avg</span>
+                            <span class="k6-value">0ms</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">P95</span>
+                            <span class="k6-value">N/A</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Error Rate</span>
+                            <span class="k6-value">0%</span>
+                        </div>
+                    </div>
+                    <div class="k6-footer">
+                        <small>Ejecutado: 11:47:57</small>
+                    </div>
+                </div>                <div class="k6-card k6-error">
+                    <div class="k6-header">
+                        <span class="k6-icon">❌</span>
+                        <h3>100 Usuarios</h3>
+                    </div>
+                    <div class="k6-metrics">
+                        <div class="k6-metric">
+                            <span class="k6-label">Req/s</span>
+                            <span class="k6-value">0</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Tiempo Avg</span>
+                            <span class="k6-value">0ms</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">P95</span>
+                            <span class="k6-value">N/A</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Error Rate</span>
+                            <span class="k6-value">0%</span>
+                        </div>
+                    </div>
+                    <div class="k6-footer">
+                        <small>Ejecutado: 11:49:03</small>
+                    </div>
+                </div>                <div class="k6-card k6-notfound">
+                    <div class="k6-header">
+                        <span class="k6-icon">📄</span>
+                        <h3>500 Usuarios</h3>
+                    </div>
+                    <div class="k6-metrics">
+                        <div class="k6-metric">
+                            <span class="k6-label">Req/s</span>
+                            <span class="k6-value">N/A</span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Tiempo Avg</span>
+                            <span class="k6-value"></span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">P95</span>
+                            <span class="k6-value"></span>
+                        </div>
+                        <div class="k6-metric">
+                            <span class="k6-label">Error Rate</span>
+                            <span class="k6-value"></span>
+                        </div>
+                    </div>
+                    <div class="k6-footer">
+                        <small>Ejecutado: </small>
+                    </div>
                 </div>            </div>
         </div>
     </div>
@@ -757,22 +662,35 @@
     <button class="refresh-btn" onclick="location.reload()">🔄 Actualizar</button>
 
     <script>
-        // Auto-refresh cada 5 minutos
-        setTimeout(function() {
-            location.reload();
-        }, 300000);
+        // Animación de carga para progress bars
+        document.addEventListener('DOMContentLoaded', function() {
+            const progressBars = document.querySelectorAll('.progress-fill');
+            progressBars.forEach(bar => {
+                const targetWidth = bar.getAttribute('data-width');
+                if (targetWidth) {
+                    bar.style.width = '0%';
+                    setTimeout(() => {
+                        bar.style.width = targetWidth;
+                    }, 500);
+                }
+            });
+        });
 
-        // Mostrar timestamp de carga
-        console.log('Dashboard cargado a las: 16 de septiembre 2025, 01:18');
-        
-        // Información adicional en consola
-        console.log('📊 Estadísticas detalladas:');
-        console.log('- Tests totales: 528');
-        console.log('- Tests exitosos: 528');
-        console.log('- Tests fallidos: 0');
-        console.log('- Cobertura promedio: 80.2%');
-        console.log('- Suites de tests: 50');
-        console.log('- Tests de carga: 4');
+        // Auto-refresh cada 30 segundos si la página está activa
+        let autoRefresh = setInterval(() => {
+            if (!document.hidden) {
+                location.reload();
+            }
+        }, 30000);
+
+        // Pausar auto-refresh cuando la página no está visible
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                clearInterval(autoRefresh);
+            } else {
+                autoRefresh = setInterval(() => location.reload(), 30000);
+            }
+        });
     </script>
 </body>
 </html>
