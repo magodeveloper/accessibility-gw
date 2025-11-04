@@ -307,7 +307,7 @@ switch ($Action) {
         
         # Iniciar servicios
         Write-ColorOutput "`nIniciando servicios..." "Yellow"
-        docker compose -f $ComposeFile up -d
+        docker compose -f $ComposeFile up -d --remove-orphans
         
         if ($LASTEXITCODE -eq 0) {
             Write-ColorOutput "✅ Servicios iniciados correctamente" "Green"
