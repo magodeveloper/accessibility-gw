@@ -149,5 +149,105 @@ namespace Gateway.UnitTests.Services
             context.Response.StatusCode.Should().Be(500);
             responseBody.Should().Contain("Gateway forwarding error");
         }
+
+        [Fact]
+        public async Task ForwardAsync_ShouldWriteErrorWithHeaders_WhenResultHasErrorWithHeaders()
+        {
+            // Arrange
+            var req = new TranslateRequest { Service = "users", Method = "GET", Path = "/api/users/1" };
+            var context = new DefaultHttpContext();
+            context.Response.Body = new MemoryStream();
+
+            // Forzar que ForwardRequestAsync devuelva error con headers usando reflection
+            var method = typeof(RequestTranslator).GetMethod("ForwardRequestAsync",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            // Mock del forwarder para devolver error
+            _mockForwarder.SendAsync(
+                Arg.Any<HttpContext>(),
+                Arg.Any<string>(),
+                Arg.Any<HttpMessageInvoker>(),
+                Arg.Any<ForwarderRequestConfig>(),
+                Arg.Any<HttpTransformer>()
+            ).Returns(callInfo =>
+            {
+                var ctx = callInfo.Arg<HttpContext>();
+                ctx.Response.StatusCode = 429; // Too Many Requests
+                ctx.Response.Headers["Retry-After"] = "60";
+                ctx.Response.Headers["X-RateLimit-Remaining"] = "0";
+                return new ValueTask<ForwarderError>(ForwarderError.RequestCreation);
+            });
+
+            // Act
+            await _translator.ForwardAsync(context, req, CancellationToken.None);
+            context.Response.Body.Seek(0, SeekOrigin.Begin);
+            var responseBody = await new StreamReader(context.Response.Body).ReadToEndAsync();
+
+            // Assert
+            // Cuando hay un error de YARP, el gateway devuelve 502 Bad Gateway
+            context.Response.StatusCode.Should().Be(502);
+            responseBody.Should().Contain("error");
+        }
+
+        [Fact]
+        public async Task ForwardAsync_ShouldHandleInvalidStatusCode_WhenResponseStatusCodeIsZero()
+        {
+            // Arrange
+            var req = new TranslateRequest { Service = "users", Method = "GET", Path = "/api/users/1" };
+            var context = new DefaultHttpContext();
+            context.Response.Body = new MemoryStream();
+
+            // Simular éxito pero con StatusCode no establecido (0)
+            _mockForwarder.SendAsync(
+                Arg.Any<HttpContext>(),
+                Arg.Any<string>(),
+                Arg.Any<HttpMessageInvoker>(),
+                Arg.Any<ForwarderRequestConfig>(),
+                Arg.Any<HttpTransformer>()
+            ).Returns(callInfo =>
+            {
+                // No establecer StatusCode, quedará en 0
+                return new ValueTask<ForwarderError>(ForwarderError.None);
+            });
+
+            // Act
+            await _translator.ForwardAsync(context, req, CancellationToken.None);
+
+            // Assert
+            // El código debe establecer un StatusCode válido por defecto
+            context.Response.StatusCode.Should().BeGreaterThan(0);
+        }
+
+        [Fact]
+        public async Task ForwardAsync_ShouldHandleEmptyResult_WhenNoErrorAndNoResponse()
+        {
+            // Arrange  
+            var req = new TranslateRequest { Service = "users", Method = "POST", Path = "/api/users" };
+            var context = new DefaultHttpContext();
+            context.Response.Body = new MemoryStream();
+
+            // Simular resultado sin error pero tampoco respuesta válida
+            // Esto es un caso edge que podría ocurrir con timeouts
+            _mockForwarder.SendAsync(
+                Arg.Any<HttpContext>(),
+                Arg.Any<string>(),
+                Arg.Any<HttpMessageInvoker>(),
+                Arg.Any<ForwarderRequestConfig>(),
+                Arg.Any<HttpTransformer>()
+            ).Returns(callInfo =>
+            {
+                // Simular timeout: YARP devuelve RequestTimedOut pero no se completa la respuesta
+                return new ValueTask<ForwarderError>(ForwarderError.RequestTimedOut);
+            });
+
+            // Act
+            await _translator.ForwardAsync(context, req, CancellationToken.None);
+            context.Response.Body.Seek(0, SeekOrigin.Begin);
+            var responseBody = await new StreamReader(context.Response.Body).ReadToEndAsync();
+
+            // Assert
+            context.Response.StatusCode.Should().Be(504); // Gateway Timeout
+            responseBody.Should().Contain("error");
+        }
     }
 }

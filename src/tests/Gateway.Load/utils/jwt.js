@@ -118,17 +118,45 @@ export function generateTestAdminToken(adminId = 'load-test-admin') {
 }
 
 /**
+ * Genera un Correlation ID único para rastreo de requests
+ * @returns {string} Correlation ID en formato UUID-like
+ */
+function generateCorrelationId() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `k6-load-${timestamp}-${random}`;
+}
+
+/**
+ * Crea headers HTTP básicos con Correlation ID
+ * 
+ * @param {Object} additionalHeaders - Headers adicionales
+ * @returns {Object} Headers HTTP con Correlation ID
+ */
+export function createBasicHeaders(additionalHeaders = {}) {
+    return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Correlation-Id': generateCorrelationId(),
+        'User-Agent': 'Gateway-LoadTest-K6/1.0',
+        ...additionalHeaders
+    };
+}
+
+/**
  * Crea headers HTTP con autenticación Bearer
  * 
  * @param {string} token - Token JWT
  * @param {Object} additionalHeaders - Headers adicionales
- * @returns {Object} Headers HTTP con Authorization
+ * @returns {Object} Headers HTTP con Authorization y Correlation ID
  */
 export function createAuthHeaders(token, additionalHeaders = {}) {
     return {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'X-Correlation-Id': generateCorrelationId(),
+        'User-Agent': 'Gateway-LoadTest-K6/1.0',
         ...additionalHeaders
     };
 }

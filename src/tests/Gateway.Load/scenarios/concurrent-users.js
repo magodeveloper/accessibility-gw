@@ -25,7 +25,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { config, endpoints, generateTestData, validateGatewayResponse, getThresholdsForLevel, getStagesForLevel } from '../utils/config.js';
 import { recordRequestMetrics } from '../utils/metrics.js';
-import { generateTestUserToken, createAuthHeaders } from '../utils/jwt.js';
+import { generateTestUserToken, createAuthHeaders, createBasicHeaders } from '../utils/jwt.js';
 import { executeHealthChecks, executeUserOperations, executeAnalysisOperations, executeReportOperations } from '../utils/scenarios-common.js';
 
 // ===== CONFIGURACIÓN PARAMETRIZABLE =====
@@ -64,16 +64,18 @@ export function setup() {
     console.log('');
 
     if (isSimpleMode) {
-        console.log('ℹ️  Modo SIMPLE: Solo endpoints básicos (/health, /ready, /metrics)');
+        console.log('ℹ️  Modo SIMPLE: Solo endpoints básicos (/health, /health/live, /metrics)');
         console.log('   No se requieren microservicios externos');
 
-        // Generar token JWT
+        // Generar token JWT y headers
         const token = generateTestUserToken(`load-test-user-${userCount}`);
         const authHeaders = createAuthHeaders(token);
-        console.log('✅ Token JWT generado');
+        const basicHeaders = createBasicHeaders();
+        console.log('✅ Token JWT y headers generados');
 
         // Verificar Gateway con timeout corto
         const healthCheck = http.get(`${config.baseUrl}${endpoints.health}`, {
+            headers: basicHeaders,
             timeout: '5s'
         });
 
@@ -85,17 +87,18 @@ export function setup() {
         }
         console.log(`✅ Gateway Health: ${healthCheck.status}`);
 
-        const readyCheck = http.get(`${config.baseUrl}${endpoints.ready}`, {
-            headers: authHeaders,
+        const liveCheck = http.get(`${config.baseUrl}${endpoints.healthLive}`, {
+            headers: basicHeaders,
             timeout: '5s'
         });
-        console.log(`✅ Gateway Ready: ${readyCheck.status}`);
+        console.log(`✅ Gateway Live: ${liveCheck.status}`);
 
         return {
             startTime: Date.now(),
             mode: 'simple',
             token: token,
-            authHeaders: authHeaders
+            authHeaders: authHeaders,
+            basicHeaders: basicHeaders
         };
     } else {
         console.log('ℹ️  Modo FULL: Todos los servicios (usuarios, análisis, reportes)');
@@ -134,29 +137,31 @@ export default function concurrentUsersTest(data) {
 function executeSimpleMode(data) {
     const rand = Math.random();
 
-    if (rand < 0.5) {
-        // 50% - Health Check
+    if (rand < 0.4) {
+        // 40% - Health Check básico (sin autenticación pero con correlation ID)
         const response = http.get(`${config.baseUrl}${endpoints.health}`, {
+            headers: data.basicHeaders,
             tags: { endpoint: 'health', mode: 'simple' }
         });
 
         check(response, validateGatewayResponse(response, 200));
         recordRequestMetrics(response, 'gateway');
 
-    } else if (rand < 0.8) {
-        // 30% - Ready Check (con auth)
-        const response = http.get(`${config.baseUrl}${endpoints.ready}`, {
-            headers: data.authHeaders,
-            tags: { endpoint: 'ready', mode: 'simple' }
+    } else if (rand < 0.7) {
+        // 30% - Health/Live Check (sin autenticación, solo verifica que el app esté vivo)
+        const response = http.get(`${config.baseUrl}${endpoints.healthLive}`, {
+            headers: data.basicHeaders,
+            tags: { endpoint: 'health_live', mode: 'simple' }
         });
 
         check(response, validateGatewayResponse(response, 200));
         recordRequestMetrics(response, 'gateway');
 
     } else {
-        // 20% - Metrics Check
-        const response = http.get(`${config.baseUrl}${endpoints.metrics}`, {
-            tags: { endpoint: 'metrics', mode: 'simple' }
+        // 30% - Metrics Check (sin autenticación pero con correlation ID)
+        const response = http.get(`${config.baseUrl}${endpoints.metricsGateway}`, {
+            headers: data.basicHeaders,
+            tags: { endpoint: 'metrics_gateway', mode: 'simple' }
         });
 
         check(response, validateGatewayResponse(response, 200));

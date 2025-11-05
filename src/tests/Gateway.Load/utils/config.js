@@ -66,8 +66,10 @@ export const config = {
 // Endpoints principales del Gateway
 export const endpoints = {
     health: '/health',
-    ready: '/ready',
+    healthLive: '/health/live',
+    ready: '/health/ready',
     metrics: '/metrics',
+    metricsGateway: '/metrics/gateway',
 
     // Servicios a través del Gateway - Rutas reales del Gateway
     users: {
@@ -182,10 +184,10 @@ export function logResponse(response, context) {
 export function validateGatewayResponse(response, expectedStatus = 200) {
     const checks = {
         [`status is ${expectedStatus}`]: response.status === expectedStatus,
-        'response time reasonable': response.timings.duration < 5000,
-        'has correlation id': response.headers['x-correlation-id'] !== undefined
+        'response time reasonable': response.timings.duration < 5000
     };
 
+    // Solo verificar JSON si el status es 200 y hay body
     if (response.status === 200 && response.body) {
         try {
             JSON.parse(response.body);

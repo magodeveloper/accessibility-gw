@@ -5,15 +5,18 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { config, endpoints, validateGatewayResponse } from './config.js';
 import { recordRequestMetrics } from './metrics.js';
+import { createBasicHeaders } from './jwt.js';
 
 /**
  * Ejecuta health checks del Gateway
  * @param {string} [group='health_checks'] - Nombre del grupo para métricas
  */
 export function executeHealthChecks(group = 'health_checks') {
+    const headers = createBasicHeaders();
+
     // Health check
     let response = http.get(`${config.baseUrl}${endpoints.health}`, {
-        headers: config.headers,
+        headers: headers,
         tags: { endpoint: 'health', group }
     });
 
@@ -22,7 +25,7 @@ export function executeHealthChecks(group = 'health_checks') {
 
     // Ready check
     response = http.get(`${config.baseUrl}${endpoints.ready}`, {
-        headers: config.headers,
+        headers: headers,
         tags: { endpoint: 'ready', group }
     });
 

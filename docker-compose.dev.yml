@@ -6,7 +6,7 @@ services:
       args:
         BUILD_CONFIGURATION: Debug
     image: accessibility-gateway:latest
-    container_name: accessibility-gateway
+    container_name: accessibility-gateway-dev
     ports:
       - "8100:8080" # Puerto estándar para desarrollo y producción
     environment:
@@ -24,7 +24,7 @@ services:
       - Jwt__Audience=https://accessibility.company.com
       - Jwt__ValidateIssuer=false
       - Jwt__ValidateAudience=false
-      - Redis__ConnectionString=accessibility-redis:6379
+      - Redis__ConnectionString=accessibility-redis-dev:6379
       - Jwt__Authority=https://localhost:8100
       - Gate__DefaultTimeoutSeconds=30
       - Gate__EnableDetailedErrors=true
@@ -62,7 +62,7 @@ services:
 
   redis:
     image: redis:7.2-alpine
-    container_name: accessibility-redis
+    container_name: accessibility-redis-dev
     ports:
       - "6379:6379" # Puerto estándar de Redis
     volumes:
@@ -104,7 +104,7 @@ services:
     environment:
       - REDIS_HOSTS=dev:accessibility-redis-dev:6379
     depends_on:
-      redis-dev:
+      redis:
         condition: service_healthy
     networks:
       - accessibility-shared

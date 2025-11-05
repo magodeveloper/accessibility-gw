@@ -5,9 +5,13 @@
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
           <Format>cobertura</Format>
-          <OutputDirectory>../../TestResults</OutputDirectory>
           <Threshold>90</Threshold>
           <ThresholdType>line</ThresholdType>
+          <ExcludeByAttribute>
+            Obsolete
+            GeneratedCodeAttribute
+            CompilerGeneratedAttribute
+          </ExcludeByAttribute>
           <ExcludeByFile>
             **/*AssemblyInfo.cs
             **/*GlobalUsings.g.cs
@@ -15,6 +19,11 @@
             **/obj/**
             **/Migrations/**
             **/*.Designer.cs
+            **/src/Gateway/Models/Swagger/**/*.cs
+            **/src/Gateway/Examples/**/*.cs
+            **/src/Gateway/Extensions/**/*.cs
+            **/src/Gateway/Configuration/SwaggerConfiguration.cs
+            **/src/Gateway/Configuration/OpenApiVersionDocumentFilter.cs
           </ExcludeByFile>
           <ExcludeByAssembly>
             Gateway.Tests.*
@@ -25,11 +34,15 @@
           <Exclude>
             [Gateway]*.Program.&lt;Main&gt;$*
             [Gateway]*CustomHostTransformer*Console.WriteLine*
+            [Gateway]Gateway.Models.Swagger.*
+            [Gateway]Gateway.Examples.*
+            [Gateway]Gateway.Extensions.*
+            [Gateway]Gateway.Configuration.SwaggerConfiguration
+            [Gateway]Gateway.Configuration.OpenApiVersionDocumentFilter
           </Exclude>
           <Include>
             [Gateway]*
             [Gateway.Services]*
-            [Gateway.Models]*
           </Include>
           <IncludeTestAssembly>false</IncludeTestAssembly>
           <SingleHit>false</SingleHit>

@@ -251,27 +251,199 @@ function Invoke-Tests {
     
     Write-ColorMessage "⏱️ Duración: $([math]::Round($duration, 2)) segundos" $Colors.Info
     
+    # Copiar archivo de cobertura a ubicación limpia (sin nombres de usuario/máquina)
+    if ($CollectCoverage) {
+        Copy-CoverageFile
+        Filter-CoverageFile
+    }
+    
     # Usar Write-Output para asegurar que solo se devuelve el hashtable
     Write-Output $testResults
+}
+
+function Copy-CoverageFile {
+    <#
+    .SYNOPSIS
+        Copia el archivo de cobertura a una ubicación limpia sin nombres de usuario/máquina
+    #>
+    Write-ColorMessage "📋 Organizando archivos de cobertura..." $Colors.Info
+    
+    # Buscar archivo de cobertura en la estructura anidada generada por coverlet
+    $coverageFiles = Get-ChildItem -Path $OutputDir -Filter "coverage.cobertura.xml" -Recurse | 
+    Sort-Object LastWriteTime -Descending
+    
+    if ($coverageFiles) {
+        $sourceFile = $coverageFiles[0]
+        $targetFile = Join-Path $OutputDir "coverage.cobertura.xml"
+        
+        # Copiar a la raíz de TestResults con nombre limpio
+        Copy-Item -Path $sourceFile.FullName -Destination $targetFile -Force
+        Write-ColorMessage "✅ Archivo de cobertura copiado a: $targetFile" $Colors.Success
+        
+        # Opcional: limpiar carpetas con nombres de usuario/máquina
+        $userFolders = Get-ChildItem -Path $OutputDir -Directory | Where-Object { 
+            $_.Name -match "^[a-zA-Z0-9]+_[a-zA-Z0-9\-]+_\d{4}-\d{2}-\d{2}_\d{2}_\d{2}_\d{2}$" 
+        }
+        
+        if ($userFolders) {
+            foreach ($folder in $userFolders) {
+                Remove-Item -Path $folder.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                Write-ColorMessage "🧹 Carpeta temporal eliminada: $($folder.Name)" $Colors.Info
+            }
+        }
+    }
+    else {
+        Write-ColorMessage "⚠️ No se encontró archivo de cobertura para copiar" $Colors.Warning
+    }
+}
+
+function Filter-CoverageFile {
+    <#
+    .SYNOPSIS
+        Filtra el archivo de cobertura para excluir clases según coverlet.runsettings
+    .DESCRIPTION
+        Lee los patrones de exclusión desde coverlet.runsettings y los aplica al archivo
+        de cobertura XML, eliminando las clases que coinciden con los patrones.
+    #>
+    $coverageFile = Join-Path $OutputDir "coverage.cobertura.xml"
+    $runsettingsFile = Join-Path $PSScriptRoot "coverlet.runsettings"
+    
+    if (!(Test-Path $coverageFile)) {
+        Write-ColorMessage "⚠️ Archivo de cobertura no encontrado para filtrar" $Colors.Warning
+        return
+    }
+    
+    if (!(Test-Path $runsettingsFile)) {
+        Write-ColorMessage "⚠️ Archivo coverlet.runsettings no encontrado" $Colors.Warning
+        return
+    }
+    
+    Write-ColorMessage "🔄 Filtrando clases excluidas de la cobertura..." $Colors.Info
+    
+    try {
+        # Leer patrones de exclusión desde coverlet.runsettings
+        [xml]$runsettings = Get-Content $runsettingsFile
+        $excludeNode = $runsettings.RunSettings.DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude
+        
+        if (!$excludeNode) {
+            Write-ColorMessage "⚠️ No se encontraron patrones de exclusión en coverlet.runsettings" $Colors.Warning
+            return
+        }
+        
+        # Extraer patrones de exclusión (omitir patrones de método como *.Program.<Main>$*)
+        $excludePatterns = @()
+        $excludeNode -split "`n" | ForEach-Object {
+            $line = $_.Trim()
+            # Filtrar líneas que son patrones de namespace/clase (no métodos)
+            if ($line -match '^\[Gateway\](Gateway\..+\.\*)$') {
+                # Conservar el patrón completo incluyendo Gateway.
+                $pattern = $matches[1]
+                $excludePatterns += $pattern
+            }
+            elseif ($line -match '^\[Gateway\](Gateway\..+)$' -and $line -notlike '*<*' -and $line -notlike '*(*') {
+                # Patrones de clases específicas sin caracteres de método
+                $pattern = $matches[1]
+                $excludePatterns += $pattern
+            }
+        }
+        
+        if ($excludePatterns.Count -eq 0) {
+            Write-ColorMessage "ℹ️ No se encontraron patrones de clase para filtrar" $Colors.Info
+            return
+        }
+        
+        Write-ColorMessage "📋 Patrones de exclusión cargados desde coverlet.runsettings:" $Colors.Info
+        foreach ($pattern in $excludePatterns) {
+            Write-ColorMessage "   • $pattern" $Colors.Info
+        }
+        
+        [xml]$coverage = Get-Content $coverageFile
+        
+        # Obtener todas las clases
+        $allClasses = $coverage.coverage.packages.package.classes.class
+        $originalCount = $allClasses.Count
+        
+        # Filtrar clases a remover
+        $classesToRemove = @()
+        foreach ($class in $allClasses) {
+            $className = $class.name
+            foreach ($pattern in $excludePatterns) {
+                if ($className -like $pattern) {
+                    $classesToRemove += $class
+                    break
+                }
+            }
+        }
+        
+        # Calcular líneas excluidas ANTES de remover
+        $excludedLinesValid = 0
+        $excludedLinesCovered = 0
+        
+        foreach ($class in $classesToRemove) {
+            $classLines = $class.lines.line
+            if ($classLines) {
+                $linesCount = if ($classLines.Count) { $classLines.Count } else { 1 }
+                $linesCovered = ($classLines | Where-Object { [int]$_.hits -gt 0 } | Measure-Object).Count
+                
+                $excludedLinesValid += $linesCount
+                $excludedLinesCovered += $linesCovered
+            }
+        }
+        
+        # Remover clases del XML
+        foreach ($class in $classesToRemove) {
+            $class.ParentNode.RemoveChild($class) | Out-Null
+        }
+        
+        # Recalcular estadísticas globales
+        $newLinesValid = [int]$coverage.coverage.'lines-valid' - $excludedLinesValid
+        $newLinesCovered = [int]$coverage.coverage.'lines-covered' - $excludedLinesCovered
+        $newLineRate = if ($newLinesValid -gt 0) { $newLinesCovered / $newLinesValid } else { 0 }
+        
+        $coverage.coverage.'lines-valid' = $newLinesValid.ToString()
+        $coverage.coverage.'lines-covered' = $newLinesCovered.ToString()
+        $coverage.coverage.'line-rate' = $newLineRate.ToString("F4")
+        
+        # Guardar el archivo filtrado (sobrescribir el original)
+        $coverage.Save($coverageFile)
+        
+        $swaggerCount = ($classesToRemove | Where-Object { $_.name -like '*Swagger*' }).Count
+        $examplesCount = ($classesToRemove | Where-Object { $_.name -like '*Examples*' }).Count
+        $extensionsCount = ($classesToRemove | Where-Object { $_.name -like '*Extensions*' }).Count
+        
+        Write-ColorMessage "✅ Cobertura filtrada: $($classesToRemove.Count) clases excluidas" $Colors.Success
+        Write-ColorMessage "   • Swagger: $swaggerCount, Examples: $examplesCount, Extensions: $extensionsCount" $Colors.Info
+        Write-ColorMessage "   • Líneas excluidas: $excludedLinesValid" $Colors.Info
+        Write-ColorMessage "   • Cobertura ajustada: $([math]::Round($newLineRate * 100, 2))%" $Colors.Success
+    }
+    catch {
+        Write-ColorMessage "❌ Error al filtrar cobertura: $_" $Colors.Error
+    }
 }
 
 function Get-CoverageData {
     Write-ColorMessage "📊 Analizando cobertura..." $Colors.Info
     
-    # Buscar archivo de cobertura más reciente
-    $coverageFiles = Get-ChildItem -Path $OutputDir -Filter "coverage.cobertura.xml" -Recurse | 
-    Sort-Object LastWriteTime -Descending
+    # Primero intentar con el archivo limpio en la raíz de TestResults
+    $coverageFile = Join-Path $OutputDir "coverage.cobertura.xml"
     
-    if (-not $coverageFiles) {
-        Write-ColorMessage "⚠️ No se encontraron archivos de cobertura" $Colors.Warning
-        return $null
+    if (-not (Test-Path $coverageFile)) {
+        # Si no existe, buscar en subdirectorios (fallback)
+        $coverageFiles = Get-ChildItem -Path $OutputDir -Filter "coverage.cobertura.xml" -Recurse | 
+        Sort-Object LastWriteTime -Descending
+        
+        if (-not $coverageFiles) {
+            Write-ColorMessage "⚠️ No se encontraron archivos de cobertura" $Colors.Warning
+            return $null
+        }
+        
+        $coverageFile = $coverageFiles[0].FullName
     }
     
-    $coverageFile = $coverageFiles[0]
-    Write-ColorMessage "📄 Archivo de cobertura: $($coverageFile.Name)" $Colors.Info
+    Write-ColorMessage "📄 Archivo de cobertura: $(Split-Path $coverageFile -Leaf)" $Colors.Info
     
     try {
-        [xml]$xml = Get-Content $coverageFile.FullName
+        [xml]$xml = Get-Content $coverageFile
         $coverage = $xml.coverage
         
         # Inicializar variables para cálculo ajustado
@@ -310,9 +482,16 @@ function Get-CoverageData {
                     }
                 }
                 
+                # Calcular LineRate desde las líneas contadas (ya filtradas)
+                $calculatedLineRate = if ($packageLinesValid -gt 0) { 
+                    [math]::Round(($packageLinesCovered / $packageLinesValid) * 100, 2) 
+                } else { 
+                    0 
+                }
+                
                 $assemblyData = @{
                     Name            = $package.name
-                    LineRate        = [math]::Round([double]$package.'line-rate' * 100, 2)
+                    LineRate        = $calculatedLineRate
                     BranchRate      = [math]::Round([double]$package.'branch-rate' * 100, 2)
                     LinesValid      = $packageLinesValid
                     LinesCovered    = $packageLinesCovered
@@ -380,10 +559,10 @@ function Get-K6LoadTestResults {
     
     try {
         $loadTestFiles = @{
-            "light-load-k6"  = "$K6ResultsPath\light-load-k6.json"
-            "medium-load-k6" = "$K6ResultsPath\medium-load-k6.json"
-            "high-load"      = "$K6ResultsPath\high-load.json"
-            "extreme-load"   = "$K6ResultsPath\extreme-load.json"
+            "light-load-k6"  = "$K6ResultsPath\concurrent-light-simple.json"
+            "medium-load-k6" = "$K6ResultsPath\concurrent-medium-simple.json"
+            "high-load"      = "$K6ResultsPath\concurrent-high-simple.json"
+            "extreme-load"   = "$K6ResultsPath\concurrent-extreme-simple.json"
         }
         
         $k6Results = @{}
@@ -397,15 +576,7 @@ function Get-K6LoadTestResults {
             if (Test-Path $filePath) {
                 try {
                     # K6 genera NDJSON (una línea JSON por métrica)
-                    # Necesitamos encontrar la línea final que contiene el resumen
                     $lines = Get-Content $filePath
-                    $metricsLine = $lines | Where-Object { $_ -match '"type":"Point"' -and $_ -match '"metric":"http_reqs"' } | Select-Object -Last 1
-                    
-                    if (-not $metricsLine) {
-                        throw "No se encontraron métricas en el archivo"
-                    }
-                    
-                    $content = $metricsLine | ConvertFrom-Json
                     
                     # Mapear usuarios según el test
                     $userCount = switch ($testName) {
@@ -415,42 +586,62 @@ function Get-K6LoadTestResults {
                         "extreme-load" { 500 }
                     }
                     
-                    # Buscar todas las métricas relevantes
-                    $httpReqs = $lines | Where-Object { $_ -match '"metric":"http_reqs"' } | Select-Object -Last 1 | ConvertFrom-Json
-                    $httpDuration = $lines | Where-Object { $_ -match '"metric":"http_req_duration"' } | Select-Object -Last 1 | ConvertFrom-Json
-                    $httpFailed = $lines | Where-Object { $_ -match '"metric":"http_req_failed"' } | Select-Object -Last 1 | ConvertFrom-Json
-                    $iterations = $lines | Where-Object { $_ -match '"metric":"iterations"' } | Select-Object -Last 1 | ConvertFrom-Json
+                    # Extraer métricas agregadas
+                    $httpReqsMetrics = $lines | Where-Object { $_ -match '"metric":"http_reqs"' } | ForEach-Object { $_ | ConvertFrom-Json }
+                    $httpDurationMetrics = $lines | Where-Object { $_ -match '"metric":"http_req_duration"' } | ForEach-Object { $_ | ConvertFrom-Json }
+                    $httpFailedMetrics = $lines | Where-Object { $_ -match '"metric":"http_req_failed"' } | ForEach-Object { $_ | ConvertFrom-Json }
                     
-                    # Extraer valores
-                    $totalRequests = if ($httpReqs.data.value) { $httpReqs.data.value } else { 0 }
-                    $reqRate = if ($totalRequests -gt 0 -and $httpReqs.data.time) { 
-                        [math]::Round($totalRequests / ($httpReqs.data.time / 1000000), 2)
-                    }
-                    else { 0 }
+                    # Calcular totales
+                    $totalRequests = ($httpReqsMetrics | Measure-Object -Property { $_.data.value } -Sum).Sum
                     
-                    $avgDuration = if ($httpDuration.data.value) { [math]::Round($httpDuration.data.value, 1) } else { 0 }
-                    $failedRate = if ($httpFailed.data.value) { [math]::Round($httpFailed.data.value * 100, 2) } else { 0 }
-                    $iterCount = if ($iterations.data.value) { $iterations.data.value } else { 0 }
+                    # Calcular duración promedio
+                    $durations = $httpDurationMetrics | ForEach-Object { $_.data.value }
+                    $avgDuration = if ($durations.Count -gt 0) { 
+                        [math]::Round(($durations | Measure-Object -Average).Average, 1) 
+                    } else { 0 }
+                    
+                    # Calcular P95 (percentil 95)
+                    $p95Duration = if ($durations.Count -gt 0) {
+                        $sorted = $durations | Sort-Object
+                        $index = [math]::Floor($sorted.Count * 0.95)
+                        [math]::Round($sorted[$index], 1)
+                    } else { 0 }
+                    
+                    # Calcular tasa de error
+                    $failedRequests = ($httpFailedMetrics | Where-Object { $_.data.value -eq 1 }).Count
+                    $failedRate = if ($totalRequests -gt 0) { 
+                        [math]::Round(($failedRequests / $totalRequests) * 100, 2) 
+                    } else { 0 }
+                    
+                    # Calcular req/s (estimado desde el tiempo total)
+                    $firstTime = ($httpReqsMetrics | Select-Object -First 1).data.time
+                    $lastTime = ($httpReqsMetrics | Select-Object -Last 1).data.time
+                    $durationSeconds = if ($firstTime -and $lastTime) {
+                        ([DateTime]$lastTime - [DateTime]$firstTime).TotalSeconds
+                    } else { 1 }
+                    $reqRate = if ($durationSeconds -gt 0 -and $totalRequests -gt 0) { 
+                        [math]::Round($totalRequests / $durationSeconds, 2)
+                    } else { 0 }
                     
                     $k6Results[$testName] = @{
                         Status     = if ($failedRate -lt 5 -and $totalRequests -gt 0) { "Success" } 
                         elseif ($totalRequests -gt 0) { "Warning" } 
                         else { "Failed" }
                         Users      = $userCount
-                        ExecutedAt = (Get-Item $filePath).LastWriteTime.ToString("HH:mm:ss")
+                        ExecutedAt = (Get-Item $filePath).LastWriteTime.ToString("dd/MM HH:mm")
                         Metrics    = @{
-                            RequestsPerSecond = $reqRate.ToString()
-                            ResponseTimeAvg   = $avgDuration.ToString() + "ms"
-                            ResponseTimeP95   = "N/A"
+                            RequestsPerSecond = $reqRate.ToString("F1")
+                            ResponseTimeAvg   = $avgDuration.ToString("F1") + "ms"
+                            ResponseTimeP95   = $p95Duration.ToString("F1") + "ms"
                             ResponseTimeP99   = "N/A"
-                            ErrorRate         = $failedRate.ToString() + "%"
-                            Iterations        = $iterCount.ToString()
+                            ErrorRate         = $failedRate.ToString("F2") + "%"
+                            TotalRequests     = $totalRequests.ToString()
                         }
                     }
                     
                     if ($failedRate -lt 5 -and $totalRequests -gt 0) { $successfulTests++ }
                     
-                    Write-ColorMessage "  ✅ $testName`: $userCount usuarios, $reqRate req/s, ${avgDuration}ms avg" $Colors.Success
+                    Write-ColorMessage "  ✅ $testName`: $userCount usuarios, $reqRate req/s, ${avgDuration}ms avg, ${p95Duration}ms P95" $Colors.Success
                 }
                 catch {
                     Write-ColorMessage "⚠️ Error al procesar $testName`: $($_.Exception.Message)" $Colors.Warning
@@ -1090,13 +1281,6 @@ function New-DashboardHtml {
             <div class="detail-card">
                 <h3>🏗️ Coverage por Assembly</h3>
                 $assemblyRows
-                <div class="assembly-row assembly-excluded">
-                    <div class="assembly-name">✅ Users.Infrastructure</div>
-                    <div class="assembly-coverage">
-                        <div class="coverage-badge coverage-excluded">0% (excluido)</div>
-                        <small>Omitido del cálculo</small>
-                    </div>
-                </div>
             </div>
             
             <div class="detail-card">

@@ -53,21 +53,21 @@ function testHealthEndpoints() {
     logResponse(healthResponse, 'Health Check');
 
     check(healthResponse, validateGatewayResponse(healthResponse, 200), {
-        tags: { endpoint: 'health' }
+        endpoint: 'health'
     });
 
     const readyResponse = http.get(`${config.baseUrl}${endpoints.ready}`);
     logResponse(readyResponse, 'Ready Check');
 
     check(readyResponse, validateGatewayResponse(readyResponse, 200), {
-        tags: { endpoint: 'ready' }
+        endpoint: 'ready'
     });
 
     const metricsResponse = http.get(`${config.baseUrl}${endpoints.metrics}`);
     logResponse(metricsResponse, 'Metrics Check');
 
     check(metricsResponse, validateGatewayResponse(metricsResponse, 200), {
-        tags: { endpoint: 'metrics' }
+        endpoint: 'metrics'
     });
 }
 
@@ -83,7 +83,7 @@ function testUsersService(userData) {
     logResponse(createResponse, 'Create User');
 
     const createCheck = check(createResponse, validateGatewayResponse(createResponse, 201), {
-        tags: { endpoint: 'users_create' }
+        endpoint: 'users_create'
     });
 
     if (createCheck && createResponse.body) {
@@ -99,7 +99,7 @@ function testUsersService(userData) {
             logResponse(getResponse, 'Get User');
 
             check(getResponse, validateGatewayResponse(getResponse, 200), {
-                tags: { endpoint: 'users_get' }
+                endpoint: 'users_get'
             });
 
             // Actualizar usuario
@@ -112,7 +112,7 @@ function testUsersService(userData) {
             logResponse(updateResponse, 'Update User');
 
             check(updateResponse, validateGatewayResponse(updateResponse, 200), {
-                tags: { endpoint: 'users_update' }
+                endpoint: 'users_update'
             });
 
             // Obtener perfil
@@ -123,7 +123,7 @@ function testUsersService(userData) {
             logResponse(profileResponse, 'Get User Profile');
 
             check(profileResponse, validateGatewayResponse(profileResponse, 200), {
-                tags: { endpoint: 'users_profile' }
+                endpoint: 'users_profile'
             });
 
             // Actualizar preferencias
@@ -135,7 +135,7 @@ function testUsersService(userData) {
             logResponse(preferencesResponse, 'Update Preferences');
 
             check(preferencesResponse, validateGatewayResponse(preferencesResponse, 200), {
-                tags: { endpoint: 'users_preferences' }
+                endpoint: 'users_preferences'
             });
 
             // Eliminar usuario (cleanup)
@@ -147,7 +147,7 @@ function testUsersService(userData) {
             logResponse(deleteResponse, 'Delete User');
 
             check(deleteResponse, validateGatewayResponse(deleteResponse, 204), {
-                tags: { endpoint: 'users_delete' }
+                endpoint: 'users_delete'
             });
 
         } catch (e) {
@@ -163,7 +163,7 @@ function testUsersService(userData) {
     logResponse(listResponse, 'List Users');
 
     check(listResponse, validateGatewayResponse(listResponse, 200), {
-        tags: { endpoint: 'users_list' }
+        endpoint: 'users_list'
     });
 }
 
@@ -179,7 +179,7 @@ function testAnalysisService(analysisData) {
     logResponse(analyzeResponse, 'Start Analysis');
 
     const analyzeCheck = check(analyzeResponse, validateGatewayResponse(analyzeResponse, 202), {
-        tags: { endpoint: 'analysis_start' }
+        endpoint: 'analysis_start'
     });
 
     if (analyzeCheck && analyzeResponse.body) {
@@ -195,7 +195,7 @@ function testAnalysisService(analysisData) {
             logResponse(statusResponse, 'Check Analysis Status');
 
             check(statusResponse, validateGatewayResponse(statusResponse, 200), {
-                tags: { endpoint: 'analysis_status' }
+                endpoint: 'analysis_status'
             });
 
         } catch (e) {
@@ -211,7 +211,7 @@ function testAnalysisService(analysisData) {
     logResponse(reportsResponse, 'Get Analysis Reports');
 
     check(reportsResponse, validateGatewayResponse(reportsResponse, 200), {
-        tags: { endpoint: 'analysis_reports' }
+        endpoint: 'analysis_reports'
     });
 
     // Análisis en lote
@@ -228,7 +228,7 @@ function testAnalysisService(analysisData) {
     logResponse(batchResponse, 'Batch Analysis');
 
     check(batchResponse, validateGatewayResponse(batchResponse, 202), {
-        tags: { endpoint: 'analysis_batch' }
+        endpoint: 'analysis_batch'
     });
 }
 
@@ -244,7 +244,7 @@ function testReportsService(reportData) {
     logResponse(generateResponse, 'Generate Report');
 
     const generateCheck = check(generateResponse, validateGatewayResponse(generateResponse, 202), {
-        tags: { endpoint: 'reports_generate' }
+        endpoint: 'reports_generate'
     });
 
     // Listar reportes
@@ -255,7 +255,7 @@ function testReportsService(reportData) {
     logResponse(listResponse, 'List Reports');
 
     check(listResponse, validateGatewayResponse(listResponse, 200), {
-        tags: { endpoint: 'reports_list' }
+        endpoint: 'reports_list'
     });
 
     if (generateCheck && generateResponse.body) {
@@ -274,7 +274,7 @@ function testReportsService(reportData) {
             check(downloadResponse, {
                 'download status acceptable': (r) => r.status === 200 || r.status === 202
             }, {
-                tags: { endpoint: 'reports_download' }
+                endpoint: 'reports_download'
             });
 
             // Intentar exportar reporte
@@ -287,7 +287,7 @@ function testReportsService(reportData) {
             check(exportResponse, {
                 'export status acceptable': (r) => r.status === 200 || r.status === 202
             }, {
-                tags: { endpoint: 'reports_export' }
+                endpoint: 'reports_export'
             });
 
         } catch (e) {

@@ -3,30 +3,30 @@
   "version": "2.0.0",
   "description": "K6 Load Tests for Accessibility Gateway - Optimized Architecture",
   "scripts": {
-    "test:smoke": "k6 run scenarios/smoke-test.js",
-    "test:load": "k6 run scenarios/load-test.js",
-    "test:stress": "k6 run scenarios/stress-test.js",
-    "test:spike": "k6 run scenarios/spike-test.js",
-    "test:endurance": "k6 run scenarios/endurance-test.js",
+    "test:smoke": "k6 run --out json=results/smoke-test.json scenarios/smoke-test.js",
+    "test:load": "k6 run --out json=results/load-test.json scenarios/load-test.js",
+    "test:stress": "k6 run --out json=results/stress-test.json scenarios/stress-test.js",
+    "test:spike": "k6 run --out json=results/spike-test.json scenarios/spike-test.js",
+    "test:endurance": "k6 run --out json=results/endurance-test.json scenarios/endurance-test.js",
     
-    "test:concurrent-light": "k6 run --env USERS=20 --env TEST_LEVEL=light --env TEST_MODE=full scenarios/concurrent-users.js",
-    "test:concurrent-light-simple": "k6 run --env USERS=20 --env TEST_LEVEL=light --env TEST_MODE=simple scenarios/concurrent-users.js",
+    "test:concurrent-light": "k6 run --out json=results/concurrent-light-simple.json --env USERS=20 --env TEST_LEVEL=light --env TEST_MODE=simple scenarios/concurrent-users.js",
+    "test:concurrent-light-full": "k6 run --out json=results/concurrent-light-full.json --env USERS=20 --env TEST_LEVEL=light --env TEST_MODE=full scenarios/concurrent-users.js",
     
-    "test:concurrent-medium": "k6 run --env USERS=50 --env TEST_LEVEL=medium --env TEST_MODE=full scenarios/concurrent-users.js",
-    "test:concurrent-medium-simple": "k6 run --env USERS=50 --env TEST_LEVEL=medium --env TEST_MODE=simple scenarios/concurrent-users.js",
+    "test:concurrent-medium": "k6 run --out json=results/concurrent-medium-simple.json --env USERS=50 --env TEST_LEVEL=medium --env TEST_MODE=simple scenarios/concurrent-users.js",
+    "test:concurrent-medium-full": "k6 run --out json=results/concurrent-medium-full.json --env USERS=50 --env TEST_LEVEL=medium --env TEST_MODE=full scenarios/concurrent-users.js",
     
-    "test:concurrent-high": "k6 run --env USERS=100 --env TEST_LEVEL=high --env TEST_MODE=full scenarios/concurrent-users.js",
-    "test:concurrent-high-simple": "k6 run --env USERS=100 --env TEST_LEVEL=high --env TEST_MODE=simple scenarios/concurrent-users.js",
+    "test:concurrent-high": "k6 run --out json=results/concurrent-high-simple.json --env USERS=100 --env TEST_LEVEL=high --env TEST_MODE=simple scenarios/concurrent-users.js",
+    "test:concurrent-high-full": "k6 run --out json=results/concurrent-high-full.json --env USERS=100 --env TEST_LEVEL=high --env TEST_MODE=full scenarios/concurrent-users.js",
     
-    "test:concurrent-extreme": "k6 run --env USERS=500 --env TEST_LEVEL=extreme --env TEST_MODE=full scenarios/concurrent-users.js",
-    "test:concurrent-extreme-simple": "k6 run --env USERS=500 --env TEST_LEVEL=extreme --env TEST_MODE=simple scenarios/concurrent-users.js",
+    "test:concurrent-extreme": "k6 run --out json=results/concurrent-extreme-simple.json --env USERS=500 --env TEST_LEVEL=extreme --env TEST_MODE=simple scenarios/concurrent-users.js",
+    "test:concurrent-extreme-full": "k6 run --out json=results/concurrent-extreme-full.json --env USERS=500 --env TEST_LEVEL=extreme --env TEST_MODE=full scenarios/concurrent-users.js",
     
     "test:concurrent-all": "npm run test:concurrent-light && npm run test:concurrent-medium && npm run test:concurrent-high",
-    "test:concurrent-all-simple": "npm run test:concurrent-light-simple && npm run test:concurrent-medium-simple && npm run test:concurrent-high-simple",
+    "test:concurrent-all-full": "npm run test:concurrent-light-full && npm run test:concurrent-medium-full && npm run test:concurrent-high-full",
     
     "test:all-classic": "npm run test:smoke && npm run test:load && npm run test:stress",
-    "test:all": "pwsh -File run-k6-tests.ps1 -Action run -Level all -Mode full",
-    "test:all-simple": "pwsh -File run-k6-tests.ps1 -Action run -Level all -Mode simple",
+    "test:all": "pwsh -File run-k6-tests.ps1 -Action run -Level all -Mode simple",
+    "test:all-full": "pwsh -File run-k6-tests.ps1 -Action run -Level all -Mode full",
     
     "clean": "pwsh -File run-k6-tests.ps1 -Action clean -Days 7",
     "help": "pwsh -File run-k6-tests.ps1 -Action help"
