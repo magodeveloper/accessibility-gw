@@ -1,0 +1,16 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/users-with-preferences",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "nickname": "janesmith",
+    "name": "Jane",
+    "lastname": "Smith",
+    "email": "newuser@example.com",
+    "password": "SecurePassword123!"
+  },
+  "description": "Crear usuario con preferencias - POST /api/users-with-preferences (crea preferencias por defecto automáticamente)"
+}

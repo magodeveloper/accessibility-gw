@@ -1,0 +1,16 @@
+{
+  "service": "analysis",
+  "method": "POST",
+  "path": "/api/Error",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "resultId": "result-555",
+    "errorType": "WCAG 2.1 AA",
+    "severity": "critical",
+    "message": "Missing alt text on image",
+    "element": "<img src='test.jpg'>"
+  },
+  "description": "Crear nuevo error - POST /api/Error"
+}

@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "DELETE",
+  "path": "/api/Error/all",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Eliminar todos los errores - DELETE /api/Error/all"
+}

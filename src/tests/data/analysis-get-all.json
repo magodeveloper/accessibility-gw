@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "GET",
+  "path": "/api/Analysis",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener todos los análisis - GET /api/Analysis"
+}

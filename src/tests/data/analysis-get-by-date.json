@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "GET",
+  "path": "/api/Analysis/by-date?date=2024-01-15",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener análisis por fecha - GET /api/Analysis/by-date"
+}

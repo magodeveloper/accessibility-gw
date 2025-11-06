@@ -33,7 +33,7 @@ public class RouteAuthorizationMiddleware
         _logger.LogInformation("=== RouteAuthorizationMiddleware === Processing {Method} {Path}", method, path);
         _logger.LogInformation("=== AllowedRoutes count: {Count} ===", _options.AllowedRoutes?.Count ?? 0);
 
-        // Rutas públicas del sistema (health, metrics, swagger)
+        // Rutas públicas del sistema (health, metrics, swagger, translate)
         var systemPublicPaths = new[]
         {
             "/health", "/health/live", "/health/ready",
@@ -42,7 +42,8 @@ public class RouteAuthorizationMiddleware
             "/info",
             "/error",
             "/cache/",
-            "/swagger" // Incluye /swagger, /swagger/, /swagger/index.html, /swagger/*/swagger.json, etc.
+            "/swagger", // Incluye /swagger, /swagger/, /swagger/index.html, /swagger/*/swagger.json, etc.
+            "/api/v1/translate" // Endpoint del traductor - valida rutas internamente
         };
 
         if (systemPublicPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))

@@ -1,0 +1,10 @@
+{
+  "service": "reports",
+  "method": "GET",
+  "path": "/api/History/by-user/123",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener historial por usuario - GET /api/History/by-user/{userId}"
+}

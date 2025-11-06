@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "DELETE",
+  "path": "/api/Error/error-789",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Eliminar error por ID - DELETE /api/Error/{id}"
+}

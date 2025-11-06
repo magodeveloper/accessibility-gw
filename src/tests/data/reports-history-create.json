@@ -1,0 +1,15 @@
+{
+  "service": "reports",
+  "method": "POST",
+  "path": "/api/History",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "userId": "123",
+    "analysisId": "analysis-456",
+    "action": "report_generated",
+    "timestamp": "2024-01-15T10:30:00Z"
+  },
+  "description": "Crear entrada de historial - POST /api/History"
+}

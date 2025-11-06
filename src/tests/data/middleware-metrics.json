@@ -1,0 +1,10 @@
+{
+  "service": "middleware",
+  "method": "GET",
+  "path": "/metrics",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener métricas del middleware - GET /metrics"
+}

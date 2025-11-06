@@ -1,0 +1,10 @@
+{
+  "service": "reports",
+  "method": "GET",
+  "path": "/api/Report",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener todos los reportes - GET /api/Report"
+}

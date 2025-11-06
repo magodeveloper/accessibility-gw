@@ -1,0 +1,16 @@
+{
+  "service": "reports",
+  "method": "POST",
+  "path": "/api/Report",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "analysisId": "analysis-456",
+    "format": "PDF",
+    "title": "Reporte de Accesibilidad Web",
+    "summary": "Análisis completo de accesibilidad",
+    "userId": "123"
+  },
+  "description": "Crear nuevo reporte - POST /api/Report"
+}

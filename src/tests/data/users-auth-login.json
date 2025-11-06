@@ -1,0 +1,13 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/Auth/login",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "email": "test@example.com",
+    "password": "TestPassword123!"
+  },
+  "description": "Login de usuario - POST /api/Auth/login"
+}

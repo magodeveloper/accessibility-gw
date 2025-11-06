@@ -1,0 +1,12 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/Auth/logout",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "email": "fgiocl@outlook.com"
+  },
+  "description": "Logout de usuario - POST /api/Auth/logout (elimina todas las sesiones del usuario)"
+}

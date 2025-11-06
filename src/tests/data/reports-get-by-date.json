@@ -1,0 +1,10 @@
+{
+  "service": "reports",
+  "method": "GET",
+  "path": "/api/Report/by-date/2024-01-15",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener reportes por fecha - GET /api/Report/by-date/{date}"
+}

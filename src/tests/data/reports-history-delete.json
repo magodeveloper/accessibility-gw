@@ -1,0 +1,10 @@
+{
+  "service": "reports",
+  "method": "DELETE",
+  "path": "/api/History/history-999",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Eliminar entrada de historial - DELETE /api/History/{id}"
+}

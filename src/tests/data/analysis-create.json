@@ -1,0 +1,15 @@
+{
+  "service": "analysis",
+  "method": "POST",
+  "path": "/api/Analysis",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "userId": "123",
+    "url": "https://example.com",
+    "tool": "axe-core",
+    "status": "pending"
+  },
+  "description": "Crear nuevo análisis - POST /api/Analysis"
+}

@@ -418,22 +418,22 @@ app.UseOutputCache();
 // Middleware para enrutamiento automático de API
 app.Use(async (context, next) =>
 {
-    var path = context.Request.Path.Value;
+    var path = context.Request.Path.Value ?? "";
     var method = context.Request.Method;
 
-    Console.WriteLine($"=== MIDDLEWARE DEBUG === {method} {path}");
+    // Console.WriteLine($"=== MIDDLEWARE DEBUG === {method} {path}");
 
     // Solo manejar rutas que empiecen con /api/ y no sean rutas internas del gateway
     if (path?.StartsWith("/api/") == true &&
         !path.StartsWith("/api/v1/translate") &&
         !path.StartsWith("/api/v1/services/"))
     {
-        Console.WriteLine($"=== INTERCEPTED API REQUEST === {method} {path}");
+        // Console.WriteLine($"=== INTERCEPTED API REQUEST === {method} {path}");
 
         var translator = context.RequestServices.GetService<RequestTranslator>();
         if (translator != null)
         {
-            Console.WriteLine("=== TRANSLATOR SERVICE OBTAINED ===");
+            // Console.WriteLine("=== TRANSLATOR SERVICE OBTAINED ===");
 
             // Obtener configuración de rutas desde appsettings.json
             var gateOptions = context.RequestServices.GetService<IOptions<GateOptions>>();
@@ -449,7 +449,7 @@ app.Use(async (context, next) =>
                 if (matchedRoute != null)
                 {
                     targetService = matchedRoute.Service;
-                    Console.WriteLine($"=== ROUTE MATCHED === PathPrefix: {matchedRoute.PathPrefix}, Service: {matchedRoute.Service}");
+                    // Console.WriteLine($"=== ROUTE MATCHED === PathPrefix: {matchedRoute.PathPrefix}, Service: {matchedRoute.Service}");
                 }
             }
 
@@ -466,7 +466,7 @@ app.Use(async (context, next) =>
                     targetService = "middleware";
             }
 
-            Console.WriteLine($"=== MAPPED TO SERVICE === {targetService ?? "null"}");
+            // Console.WriteLine($"=== MAPPED TO SERVICE === {targetService ?? "null"}");
 
             if (targetService != null)
             {
@@ -481,23 +481,23 @@ app.Use(async (context, next) =>
                         .ToDictionary(h => h.Key, h => h.Value.ToString())
                 };
 
-                Console.WriteLine($"=== TRANSLATE REQUEST CREATED === {translateRequest.Service}:{translateRequest.Method}:{translateRequest.Path}");
+                // Console.WriteLine($"=== TRANSLATE REQUEST CREATED === {translateRequest.Service}:{translateRequest.Method}:{translateRequest.Path}");
 
                 if (translator.IsAllowed(translateRequest))
                 {
-                    Console.WriteLine("=== REQUEST ALLOWED BY ACL ===");
+                    // Console.WriteLine("=== REQUEST ALLOWED BY ACL ===");
                     try
                     {
                         // Usar ForwardAsync en lugar de ProcessRequestAsync
                         // ForwardAsync maneja tanto errores como respuestas exitosas
-                        Console.WriteLine("=== CALLING FORWARDASYNC ===");
+                        // Console.WriteLine("=== CALLING FORWARDASYNC ===");
                         await translator.ForwardAsync(context, translateRequest, context.RequestAborted);
-                        Console.WriteLine("=== FORWARDASYNC COMPLETED ===");
+                        // Console.WriteLine("=== FORWARDASYNC COMPLETED ===");
                         return;
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"=== EXCEPTION IN FORWARDASYNC === {ex.Message}");
+                        // Console.WriteLine($"=== EXCEPTION IN FORWARDASYNC === {ex.Message}");
                         context.Response.StatusCode = 500;
                         context.Response.ContentType = "application/json";
                         await context.Response.WriteAsync($"{{\"error\":\"Gateway error: {ex.Message}\"}}", context.RequestAborted);
@@ -506,21 +506,21 @@ app.Use(async (context, next) =>
                 }
                 else
                 {
-                    Console.WriteLine($"=== REQUEST NOT ALLOWED BY ACL === {targetService}:{method}:{path}");
+                    // Console.WriteLine($"=== REQUEST NOT ALLOWED BY ACL === {targetService}:{method}:{path}");
                 }
             }
         }
         else
         {
-            Console.WriteLine("=== TRANSLATOR SERVICE IS NULL ===");
+            // Console.WriteLine("=== TRANSLATOR SERVICE IS NULL ===");
         }
     }
     else
     {
-        Console.WriteLine($"=== REQUEST BYPASSED === {method} {path}");
+        // Console.WriteLine($"=== REQUEST BYPASSED === {method} {path}");
     }
 
-    Console.WriteLine("=== CALLING NEXT MIDDLEWARE ===");
+    // Console.WriteLine("=== CALLING NEXT MIDDLEWARE ===");
     await next();
 });
 
@@ -535,13 +535,13 @@ app.MapPost("/api/v1/translate", async (
 {
     try
     {
-        Console.WriteLine($"=== TRANSLATE ENDPOINT DEBUG ===");
-        Console.WriteLine($"Service: {validatedReq.Service}");
-        Console.WriteLine($"Method: {validatedReq.Method}");
-        Console.WriteLine($"Path: {validatedReq.Path}");
-        Console.WriteLine($"Body: {validatedReq.Body}");
-        Console.WriteLine($"Body Length: {validatedReq.Body?.Length ?? 0}");
-        Console.WriteLine($"Content-Length: {http.Request.ContentLength}");
+        // Console.WriteLine($"=== TRANSLATE ENDPOINT DEBUG ===");
+        // Console.WriteLine($"Service: {validatedReq.Service}");
+        // Console.WriteLine($"Method: {validatedReq.Method}");
+        // Console.WriteLine($"Path: {validatedReq.Path}");
+        // Console.WriteLine($"Body: {validatedReq.Body}");
+        // Console.WriteLine($"Body ValueKind: {validatedReq.Body?.ValueKind.ToString() ?? "null"}");
+        // Console.WriteLine($"Content-Length: {http.Request.ContentLength}");
 
         // 1. Validación de tamaño de payload
         var max = opts.Value.MaxPayloadSizeBytes;
@@ -553,15 +553,7 @@ app.MapPost("/api/v1/translate", async (
         var sanitizedQuery = sanitizer.SanitizeQueryParameters(validatedReq.Query);
         var sanitizedHeaders = sanitizer.ValidateAndSanitizeHeaders(validatedReq.Headers);
 
-        // 3. Validación de servicio permitido
-        var allowedServices = opts.Value.Services?.Keys ?? Enumerable.Empty<string>();
-        if (!sanitizer.IsValidService(validatedReq.Service, allowedServices))
-        {
-            return Results.Problem($"Service '{validatedReq.Service}' is not configured",
-                statusCode: StatusCodes.Status404NotFound);
-        }
-
-        // 4. Crear request sanitizado
+        // 3. Crear request sanitizado (antes de validar servicio para poder verificar ACL primero)
         var sanitizedReq = new TranslateRequest
         {
             Service = validatedReq.Service,
@@ -572,17 +564,25 @@ app.MapPost("/api/v1/translate", async (
             Body = validatedReq.Body // ¡SOLUCIÓN: Asignar el Body!
         };
 
-        Console.WriteLine($"=== SANITIZED REQUEST ===");
-        Console.WriteLine($"Service: {sanitizedReq.Service}");
-        Console.WriteLine($"Method: {sanitizedReq.Method}");
-        Console.WriteLine($"Path: {sanitizedReq.Path}");
-        Console.WriteLine($"Body: {sanitizedReq.Body}");
-        Console.WriteLine($"Body Type: {sanitizedReq.Body?.GetType().Name ?? "null"}");
-        Console.WriteLine($"=== END SANITIZED REQUEST ===");
+        // Console.WriteLine($"=== SANITIZED REQUEST ===");
+        // Console.WriteLine($"Service: {sanitizedReq.Service}");
+        // Console.WriteLine($"Method: {sanitizedReq.Method}");
+        // Console.WriteLine($"Path: {sanitizedReq.Path}");
+        // Console.WriteLine($"Body: {sanitizedReq.Body}");
+        // Console.WriteLine($"Body Type: {sanitizedReq.Body?.GetType().Name ?? "null"}");
+        // Console.WriteLine($"=== END SANITIZED REQUEST ===");
 
-        // 5. Validaciones de ACL
+        // 4. Validaciones de ACL (antes de validar servicio para no revelar servicios existentes)
         if (!translator.IsAllowed(sanitizedReq))
             return Results.Problem("Route not allowed by ACL", statusCode: StatusCodes.Status403Forbidden);
+
+        // 5. Validación de servicio permitido (después de ACL por seguridad)
+        var allowedServices = opts.Value.Services?.Keys ?? Enumerable.Empty<string>();
+        if (!sanitizer.IsValidService(validatedReq.Service, allowedServices))
+        {
+            return Results.Problem($"Service '{validatedReq.Service}' is not configured",
+                statusCode: StatusCodes.Status404NotFound);
+        }
 
         // 6. Propagar Authorization del cliente (sanitizado)
         if (http.Request.Headers.TryGetValue("Authorization", out var bearer))

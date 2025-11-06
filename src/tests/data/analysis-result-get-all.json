@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "GET",
+  "path": "/api/Result",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener todos los resultados - GET /api/Result"
+}

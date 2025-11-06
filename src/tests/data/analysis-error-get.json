@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "GET",
+  "path": "/api/Error/error-789",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener error por ID - GET /api/Error/{id}"
+}

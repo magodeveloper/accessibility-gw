@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "GET",
+  "path": "/api/Error",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener todos los errores - GET /api/Error"
+}

@@ -1,12 +1,12 @@
 services:
-  accessibility-gateway-dev:
+  accessibility-gateway:
     build:
       context: .
       dockerfile: Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
     image: accessibility-gateway:latest
-    container_name: accessibility-gateway-dev
+    container_name: accessibility-gateway
     ports:
       - "8100:8080" # Puerto estándar para desarrollo y producción
     environment:
@@ -24,7 +24,7 @@ services:
       - Jwt__Audience=https://accessibility.company.com
       - Jwt__ValidateIssuer=false
       - Jwt__ValidateAudience=false
-      - Redis__ConnectionString=accessibility-redis-dev:6379
+      - Redis__ConnectionString=redis:6379
       - Jwt__Authority=https://localhost:8100
       - Gate__DefaultTimeoutSeconds=30
       - Gate__EnableDetailedErrors=true
@@ -62,7 +62,7 @@ services:
 
   redis:
     image: redis:7.2-alpine
-    container_name: accessibility-redis-dev
+    container_name: accessibility-redis
     ports:
       - "6379:6379" # Puerto estándar de Redis
     volumes:
@@ -102,7 +102,7 @@ services:
     ports:
       - "8082:8081"
     environment:
-      - REDIS_HOSTS=dev:accessibility-redis-dev:6379
+      - REDIS_HOSTS=dev:accessibility-redis:6379
     depends_on:
       redis:
         condition: service_healthy
@@ -115,7 +115,7 @@ services:
 volumes:
   gateway-dev-logs:
     driver: local
-    name: accessibility-gateway-dev-logs
+    name: accessibility-gateway-logs
   redis-data:
     driver: local
     name: accessibility-redis-data

@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "DELETE",
+  "path": "/api/Result/all",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Eliminar todos los resultados - DELETE /api/Result/all"
+}

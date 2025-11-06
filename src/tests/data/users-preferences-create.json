@@ -1,0 +1,16 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/preferences",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "userId": "123",
+    "theme": "dark",
+    "language": "es",
+    "fontSize": "medium",
+    "notifications": true
+  },
+  "description": "Crear preferencias de usuario - POST /api/preferences"
+}

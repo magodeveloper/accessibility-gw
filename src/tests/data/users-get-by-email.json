@@ -1,0 +1,10 @@
+{
+  "service": "users",
+  "method": "GET",
+  "path": "/api/users/by-email?email=test@example.com",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener usuario por email - GET /api/users/by-email"
+}

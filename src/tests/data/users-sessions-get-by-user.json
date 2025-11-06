@@ -1,0 +1,10 @@
+{
+  "service": "users",
+  "method": "GET",
+  "path": "/api/sessions/user?userId=123",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener sesiones por usuario - GET /api/sessions/user"
+}

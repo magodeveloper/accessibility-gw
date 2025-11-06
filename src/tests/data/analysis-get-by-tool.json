@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "GET",
+  "path": "/api/Analysis/by-tool?tool=axe-core",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener análisis por herramienta - GET /api/Analysis/by-tool"
+}

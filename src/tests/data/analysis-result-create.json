@@ -1,0 +1,17 @@
+{
+  "service": "analysis",
+  "method": "POST",
+  "path": "/api/Result",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "analysisId": "analysis-456",
+    "level": "AA",
+    "severity": "moderate",
+    "score": 85.5,
+    "totalIssues": 12,
+    "criticalIssues": 2
+  },
+  "description": "Crear nuevo resultado - POST /api/Result"
+}

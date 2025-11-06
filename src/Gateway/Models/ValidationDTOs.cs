@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Gateway.Models;
@@ -46,10 +47,9 @@ public class ValidatedTranslateRequest
     public Dictionary<string, string> Headers { get; set; } = new();
 
     /// <summary>
-    /// Body de la request - validación de tamaño
+    /// Body de la request - puede ser un objeto JSON o string
     /// </summary>
-    [StringLength(1048576, ErrorMessage = "Body cannot exceed 1MB")] // 1MB limit
-    public string? Body { get; set; }
+    public JsonElement? Body { get; set; }
 }
 
 /// <summary>

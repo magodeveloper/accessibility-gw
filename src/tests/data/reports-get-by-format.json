@@ -1,0 +1,10 @@
+{
+  "service": "reports",
+  "method": "GET",
+  "path": "/api/Report/by-format/PDF",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener reportes por formato - GET /api/Report/by-format/{format}"
+}

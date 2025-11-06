@@ -1,0 +1,10 @@
+{
+  "service": "reports",
+  "method": "GET",
+  "path": "/api/Report/by-analysis/analysis-456",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener reportes por ID de análisis - GET /api/Report/by-analysis/{analysisId}"
+}

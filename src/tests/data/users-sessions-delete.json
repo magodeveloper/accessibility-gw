@@ -1,0 +1,10 @@
+{
+  "service": "users",
+  "method": "DELETE",
+  "path": "/api/sessions?sessionId=session-123",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Eliminar sesión específica - DELETE /api/sessions"
+}

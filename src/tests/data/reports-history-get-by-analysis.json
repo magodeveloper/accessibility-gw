@@ -1,0 +1,10 @@
+{
+  "service": "reports",
+  "method": "GET",
+  "path": "/api/History/by-analysis/analysis-456",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener historial por análisis - GET /api/History/by-analysis/{analysisId}"
+}

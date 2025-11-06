@@ -1,0 +1,10 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/Auth/confirm-email/1",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Confirmación de email - POST /api/Auth/confirm-email/{userId} (cambia el ID según el usuario creado)"
+}

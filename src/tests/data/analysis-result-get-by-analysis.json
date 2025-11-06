@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "GET",
+  "path": "/api/Result/by-analysis?analysisId=analysis-456",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Obtener resultados por análisis - GET /api/Result/by-analysis"
+}

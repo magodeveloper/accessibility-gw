@@ -1,0 +1,10 @@
+{
+  "service": "analysis",
+  "method": "DELETE",
+  "path": "/api/Result/result-555",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Eliminar resultado por ID - DELETE /api/Result/{id}"
+}

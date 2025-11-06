@@ -1,0 +1,10 @@
+{
+  "service": "middleware",
+  "method": "GET",
+  "path": "/health",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {},
+  "description": "Verificar estado de salud del middleware - GET /health"
+}
