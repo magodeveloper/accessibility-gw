@@ -56,8 +56,20 @@ public class RouteAuthorizationMiddleware
         // Buscar si esta ruta está configurada en AllowedRoutes
         // IMPORTANTE: Ordenar por PathPrefix descendente para que rutas más específicas (/api/Report/all)
         // se evalúen antes que rutas genéricas (/api/Report/{id})
-        var matchedRoute = _options.AllowedRoutes?
+        var candidateRoutes = _options.AllowedRoutes?
             .Where(route => route.Methods.Contains(method, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        _logger.LogInformation("=== CANDIDATE ROUTES === Found {Count} routes with method {Method}", candidateRoutes?.Count ?? 0, method);
+        if (candidateRoutes != null && candidateRoutes.Count > 0)
+        {
+            foreach (var route in candidateRoutes)
+            {
+                _logger.LogInformation("  - {Service}: {PathPrefix} (requiresAuth={RequiresAuth})",
+                    route.Service, route.PathPrefix, route.RequiresAuth);
+            }
+        }
+        var matchedRoute = candidateRoutes?
             .OrderByDescending(route => route.PathPrefix.Length)
             .FirstOrDefault(route => path.StartsWith(route.PathPrefix, StringComparison.OrdinalIgnoreCase));
 
