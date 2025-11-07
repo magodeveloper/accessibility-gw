@@ -1,0 +1,21 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/preferences",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJuZXd1c2VyQGV4YW1wbGUuY29tIiwibmFtZSI6IkpvaG4gRG9lIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoidXNlciIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWVpZGVudGlmaWVyIjoiMiIsImp0aSI6IjVjYWM1MThjLTg5NjctNDc0Mi1iMjk5LTZjODZiYzEwOTQyZSIsImlhdCI6IjE3NjI1MjM5MzUiLCJuYmYiOjE3NjI1MjM5MzUsImV4cCI6MTc2MjYxMDMzNSwiaXNzIjoiaHR0cHM6Ly9hY2Nlc3NpYmlsaXR5LmNvbXBhbnkuY29tIiwiYXVkIjoiaHR0cHM6Ly9hY2Nlc3NpYmlsaXR5LmNvbXBhbnkuY29tIn0.Eu7mPYbUZaxXLFNbTbYe084qeon_vN_wVY8c2f-uVEc"
+  },
+  "body": {
+    "userId": 2,
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA",
+    "language": "es",
+    "visualTheme": "dark",
+    "reportFormat": "pdf",
+    "notificationsEnabled": true,
+    "aiResponseLevel": "intermediate",
+    "fontSize": 14
+  },
+  "description": "Crear preferencias de usuario - POST /api/preferences (requiere autenticación JWT). Campos requeridos: userId (int), wcagVersion (2.0|2.1|2.2), wcagLevel (A|AA|AAA). Opcionales: language (es|en), visualTheme (light|dark), reportFormat (pdf|html|json), notificationsEnabled (bool), aiResponseLevel (basic|intermediate|detailed), fontSize (int)"
+}

@@ -1,0 +1,11 @@
+{
+  "service": "users",
+  "method": "GET",
+  "path": "/api/sessions",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJmZ2lvY2xAb3V0bG9vay5jb20iLCJuYW1lIjoiR2VvdmFubnkgQ2FtYWNobyIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6InVzZXIiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjEiLCJqdGkiOiI0ZWEzZWQ4MC03OGY2LTQ1MTYtYTQ2My1mYjg3ZTBiMDExMTQiLCJpYXQiOiIxNzYyNTIxNzU1IiwibmJmIjoxNzYyNTIxNzU1LCJleHAiOjE3NjI2MDgxNTUsImlzcyI6Imh0dHBzOi8vYWNjZXNzaWJpbGl0eS5jb21wYW55LmNvbSIsImF1ZCI6Imh0dHBzOi8vYWNjZXNzaWJpbGl0eS5jb21wYW55LmNvbSJ9.6Glq9TBAu1kKRJRDtWyKNZ0JwSqvxyi1FyWPEMm5kwc"
+  },
+  "body": {},
+  "description": "Obtener todas las sesiones - GET /api/sessions (requiere autenticación JWT)"
+}

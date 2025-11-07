@@ -584,11 +584,11 @@ app.MapPost("/api/v1/translate", async (
                 statusCode: StatusCodes.Status404NotFound);
         }
 
-        // 6. Propagar Authorization del cliente (sanitizado)
+        // 6. Propagar Authorization del cliente (SIN sanitizar, es un JWT)
         if (http.Request.Headers.TryGetValue("Authorization", out var bearer))
         {
-            var sanitizedBearer = sanitizer.SanitizeString(bearer.ToString());
-            sanitizedReq.Headers["Authorization"] = sanitizedBearer;
+            // NO sanitizar el token JWT, solo propagarlo tal cual
+            sanitizedReq.Headers["Authorization"] = bearer.ToString();
         }
 
         // 7. Forward con request sanitizado
@@ -619,7 +619,7 @@ app.MapPost("/api/v1/translate", async (
 // Endpoint directo para cada servicio - SIN path adicional
 app.MapMethods("/api/v1/services/{service}",
     new[] { "GET", "POST", "PUT", "PATCH", "DELETE" },
-    async (string service, HttpContext context, RequestTranslator translator) =>
+    async (string service, HttpContext context, RequestTranslator translator, IOptions<GateOptions> opts) =>
 {
     var request = new TranslateRequest
     {
@@ -635,6 +635,24 @@ app.MapMethods("/api/v1/services/{service}",
     if (!translator.IsAllowed(request))
         return Results.Problem("Route not allowed", statusCode: StatusCodes.Status403Forbidden);
 
+    // Validar si la ruta requiere autenticación
+    var matchedRoute = opts.Value.AllowedRoutes
+        .Where(route => route.Methods.Contains(request.Method, StringComparer.OrdinalIgnoreCase))
+        .OrderByDescending(route => route.PathPrefix.Length)
+        .FirstOrDefault(route =>
+            string.Equals(route.Service, request.Service, StringComparison.OrdinalIgnoreCase) &&
+            request.Path.StartsWith(route.PathPrefix, StringComparison.OrdinalIgnoreCase));
+
+    if (matchedRoute != null && matchedRoute.RequiresAuth)
+    {
+        if (context.User?.Identity?.IsAuthenticated != true)
+        {
+            return Results.Problem(
+                "This endpoint requires authentication. Please provide a valid JWT token.",
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+    }
+
     await translator.ForwardAsync(context, request, context.RequestAborted);
     return Results.Empty;
 })
@@ -647,7 +665,7 @@ app.MapMethods("/api/v1/services/{service}",
 // Endpoint directo para cada servicio - CON path adicional
 app.MapMethods("/api/v1/services/{service}/{**path}",
     new[] { "GET", "POST", "PUT", "PATCH", "DELETE" },
-    async (string service, string path, HttpContext context, RequestTranslator translator) =>
+    async (string service, string path, HttpContext context, RequestTranslator translator, IOptions<GateOptions> opts) =>
 {
     var request = new TranslateRequest
     {
@@ -662,6 +680,24 @@ app.MapMethods("/api/v1/services/{service}/{**path}",
 
     if (!translator.IsAllowed(request))
         return Results.Problem("Route not allowed", statusCode: StatusCodes.Status403Forbidden);
+
+    // Validar si la ruta requiere autenticación
+    var matchedRoute = opts.Value.AllowedRoutes
+        .Where(route => route.Methods.Contains(request.Method, StringComparer.OrdinalIgnoreCase))
+        .OrderByDescending(route => route.PathPrefix.Length)
+        .FirstOrDefault(route =>
+            string.Equals(route.Service, request.Service, StringComparison.OrdinalIgnoreCase) &&
+            request.Path.StartsWith(route.PathPrefix, StringComparison.OrdinalIgnoreCase));
+
+    if (matchedRoute != null && matchedRoute.RequiresAuth)
+    {
+        if (context.User?.Identity?.IsAuthenticated != true)
+        {
+            return Results.Problem(
+                "This endpoint requires authentication. Please provide a valid JWT token.",
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+    }
 
     await translator.ForwardAsync(context, request, context.RequestAborted);
     return Results.Empty;

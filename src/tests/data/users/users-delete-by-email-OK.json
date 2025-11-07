@@ -1,0 +1,11 @@
+{
+  "service": "users",
+  "method": "DELETE",
+  "path": "/api/users/by-email/newuser@example.com",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJuZXd1c2VyQGV4YW1wbGUuY29tIiwibmFtZSI6IkpvaG4gRG9lIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoidXNlciIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWVpZGVudGlmaWVyIjoiMiIsImp0aSI6Ijc4YTg1OWJmLTc5ZTgtNDFkMS04NGNmLWY5OTcyOGFmMDlhYSIsImlhdCI6IjE3NjI1MjM3NzIiLCJuYmYiOjE3NjI1MjM3NzIsImV4cCI6MTc2MjYxMDE3MiwiaXNzIjoiaHR0cHM6Ly9hY2Nlc3NpYmlsaXR5LmNvbXBhbnkuY29tIiwiYXVkIjoiaHR0cHM6Ly9hY2Nlc3NpYmlsaXR5LmNvbXBhbnkuY29tIn0.3ObH83NbUJEKNKWM2C3g85tUvYeQVCM3Fzm0Rm9eSjU"
+  },
+  "body": {},
+  "description": "Eliminar usuario por email - DELETE /api/users/by-email/{email} (requiere autenticación JWT). ADVERTENCIA: Esta operación es irreversible."
+}

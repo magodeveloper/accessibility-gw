@@ -1,0 +1,16 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/users",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "nickname": "johndoe123",
+    "name": "John",
+    "lastname": "Doe",
+    "email": "newuser@example.com",
+    "password": "SecurePassword123!"
+  },
+  "description": "Crear nuevo usuario - POST /api/users (NO requiere autenticación - registro público). Campos requeridos: nickname, name, lastname, email, password"
+}

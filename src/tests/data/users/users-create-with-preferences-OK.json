@@ -1,0 +1,16 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/users-with-preferences",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "nickname": "janesmith",
+    "name": "Jane",
+    "lastname": "Smith",
+    "email": "newuser@example.com",
+    "password": "SecurePassword123!"
+  },
+  "description": "Crear usuario con preferencias - POST /api/users-with-preferences (NO requiere autenticación - registro público). Crea automáticamente preferencias por defecto: WCAG 2.1, nivel AA, español, tema claro, formato PDF, notificaciones activadas, AI intermedio, tamaño fuente 14. Campos requeridos: nickname, name, lastname, email, password"
+}

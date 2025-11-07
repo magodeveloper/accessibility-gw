@@ -1,0 +1,13 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/Auth/logout",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJmZ2lvY2xAb3V0bG9vay5jb20iLCJuYW1lIjoiR2VvdmFubnkgQ2FtYWNobyIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6InVzZXIiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjEiLCJqdGkiOiI3NDcxMDI2YS1iNThhLTRmM2MtYjBkOS0zZGI1MWIwOWYxZWUiLCJpYXQiOiIxNzYyNDk5MjQ4IiwibmJmIjoxNzYyNDk5MjQ4LCJleHAiOjE3NjI1ODU2NDgsImlzcyI6Imh0dHBzOi8vYWNjZXNzaWJpbGl0eS5jb21wYW55LmNvbSIsImF1ZCI6Imh0dHBzOi8vYWNjZXNzaWJpbGl0eS5jb21wYW55LmNvbSJ9.qbfwIOKtUj8xUczW39sckvaQNCsdDKcBnd6A19ryRcY..."
+  },
+  "body": {
+    "email": "fgiocl@outlook.com"
+  },
+  "description": "Logout de usuario - POST /api/Auth/logout (requiere autenticación JWT - elimina todas las sesiones del usuario)"
+}

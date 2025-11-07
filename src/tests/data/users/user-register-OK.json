@@ -1,0 +1,16 @@
+{
+  "service": "users",
+  "method": "POST",
+  "path": "/api/Auth/register",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "email": "fgiocl@outlook.com",
+    "password": "Y0urs3cretG7&",
+    "name": "Geovanny",
+    "lastname": "Camacho",
+    "nickname": "fgiocl"
+  },
+  "description": "Registro de usuario - POST /api/Auth/register"
+}
