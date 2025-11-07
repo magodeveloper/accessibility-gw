@@ -1,0 +1,11 @@
+{
+  "service": "users",
+  "method": "GET",
+  "path": "/api/users",
+  "headers": {
+    "Content-Type": "application/json",
+    "Accept-Language": "en-US"
+  },
+  "body": {},
+  "description": "Get all users - GET /api/users (NO authentication required)"
+}

@@ -6,8 +6,8 @@
     "Content-Type": "application/json"
   },
   "body": {
-    "email": "fgiocl@outlook.com",
-    "password": "Y0urs3cretG7&"
+    "email": "user@outlook.com",
+    "password": "TestingG7&"
   },
   "description": "Login de usuario - POST /api/Auth/login"
 }

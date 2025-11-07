@@ -94,6 +94,3 @@ health_check
 .env.production
 .env.testing
 *.env
-
-# Test data
-src/test/data

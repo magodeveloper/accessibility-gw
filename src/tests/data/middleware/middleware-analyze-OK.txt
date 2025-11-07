@@ -1,0 +1,119 @@
+{
+  "service": "middleware",
+  "method": "POST",
+  "path": "/api/analyze",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJ1c2VyQG91dGxvb2suY29tIiwibmFtZSI6Ikdlb3Zhbm55IENhbWFjaG8iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJ1c2VyIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiIxIiwianRpIjoiMTUwNjI1MjItZjFiMS00YWRlLTkxNmYtZTRiMWQ2ZWMxMWEzIiwiaWF0IjoiMTc2MjUzMzE2NiIsIm5iZiI6MTc2MjUzMzE2NiwiZXhwIjoxNzYyNjE5NTY2LCJpc3MiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20iLCJhdWQiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20ifQ.o1hWgfloc3EqfMdOX73oENHvm-LJ2w7mCiU8oZrjHPU"
+  },
+  "body": {
+    "inputType": "url",
+    "value": "https://example.com",
+    "tool": "axe-core",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA",
+    "cumulativeWcag": false,
+    "userId": 1
+  },
+  "description": "Analizar sitio web con usuario autenticado - POST /api/analyze (guarda en BD con userId)"
+}
+
+{
+  "service": "middleware",
+  "method": "POST",
+  "path": "/api/analyze",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJ1c2VyQG91dGxvb2suY29tIiwibmFtZSI6Ikdlb3Zhbm55IENhbWFjaG8iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJ1c2VyIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiIxIiwianRpIjoiMTUwNjI1MjItZjFiMS00YWRlLTkxNmYtZTRiMWQ2ZWMxMWEzIiwiaWF0IjoiMTc2MjUzMzE2NiIsIm5iZiI6MTc2MjUzMzE2NiwiZXhwIjoxNzYyNjE5NTY2LCJpc3MiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20iLCJhdWQiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20ifQ.o1hWgfloc3EqfMdOX73oENHvm-LJ2w7mCiU8oZrjHPU"
+  },
+  "body": {
+    "inputType": "url",
+    "value": "https://example.com",
+    "tool": "equal-access",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA",
+    "cumulativeWcag": false,
+    "userId": 1
+  },
+  "description": "Analizar sitio web con usuario autenticado - POST /api/analyze (guarda en BD con userId)"
+}
+
+{
+  "service": "middleware",
+  "method": "POST",
+  "path": "/api/analyze",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJ1c2VyQG91dGxvb2suY29tIiwibmFtZSI6Ikdlb3Zhbm55IENhbWFjaG8iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJ1c2VyIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiIxIiwianRpIjoiMTUwNjI1MjItZjFiMS00YWRlLTkxNmYtZTRiMWQ2ZWMxMWEzIiwiaWF0IjoiMTc2MjUzMzE2NiIsIm5iZiI6MTc2MjUzMzE2NiwiZXhwIjoxNzYyNjE5NTY2LCJpc3MiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20iLCJhdWQiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20ifQ.o1hWgfloc3EqfMdOX73oENHvm-LJ2w7mCiU8oZrjHPU"
+  },
+  "body": {
+    "inputType": "url",
+    "value": "https://example.com",
+    "tool": "both",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA",
+    "cumulativeWcag": false,
+    "userId": 1
+  },
+  "description": "Analizar sitio web con usuario autenticado - POST /api/analyze (guarda en BD con userId)"
+}
+
+{
+  "service": "middleware",
+  "method": "POST",
+  "path": "/api/analyze",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJ1c2VyQG91dGxvb2suY29tIiwibmFtZSI6Ikdlb3Zhbm55IENhbWFjaG8iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJ1c2VyIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiIxIiwianRpIjoiMTUwNjI1MjItZjFiMS00YWRlLTkxNmYtZTRiMWQ2ZWMxMWEzIiwiaWF0IjoiMTc2MjUzMzE2NiIsIm5iZiI6MTc2MjUzMzE2NiwiZXhwIjoxNzYyNjE5NTY2LCJpc3MiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20iLCJhdWQiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20ifQ.o1hWgfloc3EqfMdOX73oENHvm-LJ2w7mCiU8oZrjHPU"
+  },
+  "body": {
+    "inputType": "html",
+    "value": "<!DOCTYPE html><html lang='es'><head><title>Test</title></head><body><h1>Hola Mundo</h1></body></html>",
+    "tool": "axe-core",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA",
+    "cumulativeWcag": false,
+    "userId": 1
+  },
+  "description": "Analizar sitio web con usuario autenticado - POST /api/analyze (guarda en BD con userId)"
+}
+
+{
+  "service": "middleware",
+  "method": "POST",
+  "path": "/api/analyze",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJ1c2VyQG91dGxvb2suY29tIiwibmFtZSI6Ikdlb3Zhbm55IENhbWFjaG8iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJ1c2VyIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiIxIiwianRpIjoiMTUwNjI1MjItZjFiMS00YWRlLTkxNmYtZTRiMWQ2ZWMxMWEzIiwiaWF0IjoiMTc2MjUzMzE2NiIsIm5iZiI6MTc2MjUzMzE2NiwiZXhwIjoxNzYyNjE5NTY2LCJpc3MiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20iLCJhdWQiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20ifQ.o1hWgfloc3EqfMdOX73oENHvm-LJ2w7mCiU8oZrjHPU"
+  },
+  "body": {
+    "inputType": "html",
+    "value": "<!DOCTYPE html><html lang='es'><head><title>Test</title></head><body><h1>Hola Mundo</h1></body></html>",
+    "tool": "equal-access",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA",
+    "cumulativeWcag": false,
+    "userId": 1
+  },
+  "description": "Analizar sitio web con usuario autenticado - POST /api/analyze (guarda en BD con userId)"
+}
+
+{
+  "service": "middleware",
+  "method": "POST",
+  "path": "/api/analyze",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJ1c2VyQG91dGxvb2suY29tIiwibmFtZSI6Ikdlb3Zhbm55IENhbWFjaG8iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJ1c2VyIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiIxIiwianRpIjoiMTUwNjI1MjItZjFiMS00YWRlLTkxNmYtZTRiMWQ2ZWMxMWEzIiwiaWF0IjoiMTc2MjUzMzE2NiIsIm5iZiI6MTc2MjUzMzE2NiwiZXhwIjoxNzYyNjE5NTY2LCJpc3MiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20iLCJhdWQiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20ifQ.o1hWgfloc3EqfMdOX73oENHvm-LJ2w7mCiU8oZrjHPU"
+  },
+  "body": {
+    "inputType": "html",
+    "value": "<!DOCTYPE html><html lang='es'><head><title>Test</title></head><body><h1>Hola Mundo</h1></body></html>",
+    "tool": "both",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA",
+    "cumulativeWcag": false,
+    "userId": 1
+  },
+  "description": "Analizar sitio web con usuario autenticado - POST /api/analyze (guarda en BD con userId)"
+}
