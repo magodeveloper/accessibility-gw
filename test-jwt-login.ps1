@@ -16,21 +16,71 @@ Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "   TEST FLUJO COMPLETO JWT AUTHENTICATION" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "⚠️  NOTA IMPORTANTE:" -ForegroundColor Yellow
-Write-Host "Este test requiere un usuario válido en la base de datos." -ForegroundColor White
-Write-Host "El microservicio usa BCrypt para hashear passwords." -ForegroundColor White
-Write-Host ""
-Write-Host "Para crear un usuario de prueba, ejecuta desde el microservicio:" -ForegroundColor Cyan
-Write-Host "  cd c:\Git\accessibility-ms-users" -ForegroundColor Gray
-Write-Host "  # Usar endpoint de registro o seed data con BCrypt hash" -ForegroundColor Gray
-Write-Host ""
 
-# Usar usuario de prueba predefinido
-Write-Host "[SETUP] Intentando login con usuario de prueba..." -ForegroundColor Yellow
-$testEmail = "testjwt@test.com"
-$testPassword = "Test123!"
-Write-Host "Email: $testEmail" -ForegroundColor White
-Write-Host "Password: $testPassword" -ForegroundColor White
+# PASO 0: Intentar crear usuario de prueba
+Write-Host "[PASO 0] Preparando usuario de prueba..." -ForegroundColor Yellow
+$createUserFilePath = "src\tests\data\test-create-user.json"
+$loginFilePath = "src\tests\data\test-login.example.json"
+
+if (Test-Path $createUserFilePath) {
+    Write-Host "✅ Archivo de creación encontrado: $createUserFilePath" -ForegroundColor Green
+    $createUserData = Get-Content $createUserFilePath | ConvertFrom-Json
+    
+    Write-Host "Intentando crear usuario: $($createUserData.email)" -ForegroundColor White
+    
+    try {
+        # Usar el endpoint público de registro /api/Auth/register
+        $registerBody = @{
+            email    = $createUserData.email
+            password = $createUserData.password
+            name     = $createUserData.name
+            lastname = $createUserData.lastname
+            nickname = $createUserData.nickname
+        } | ConvertTo-Json
+
+        $createResponse = Invoke-RestMethod -Uri "http://localhost:8100/api/Auth/register" `
+            -Method POST `
+            -Headers @{"Content-Type" = "application/json" } `
+            -Body $registerBody `
+            -ErrorAction Stop
+        
+        Write-Host "✅ Usuario creado exitosamente" -ForegroundColor Green
+        Write-Host "   User ID: $($createResponse.userId)" -ForegroundColor DarkGray
+    }
+    catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        if ($statusCode -eq 409 -or $_.Exception.Message -match "already exists|duplicate") {
+            Write-Host "ℹ️  Usuario ya existe - continuando con login" -ForegroundColor Cyan
+        }
+        elseif ($statusCode -eq 400) {
+            Write-Host "⚠️  Usuario posiblemente ya existe (400) - continuando" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "⚠️  No se pudo crear usuario: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "   Intentando continuar con usuario existente..." -ForegroundColor Gray
+        }
+    }
+    
+    # Usar credenciales del archivo de creación para login
+    $testEmail = $createUserData.email
+    $testPassword = $createUserData.password
+}
+elseif (Test-Path $loginFilePath) {
+    Write-Host "ℹ️  Usando credenciales de: $loginFilePath" -ForegroundColor Cyan
+    $loginData = Get-Content $loginFilePath | ConvertFrom-Json
+    $testEmail = $loginData.email
+    $testPassword = $loginData.password
+}
+else {
+    Write-Host "⚠️  Archivos de configuración no encontrados" -ForegroundColor Yellow
+    Write-Host "Usando credenciales por defecto..." -ForegroundColor White
+    $testEmail = "testjwt@test.com"
+    $testPassword = "Test123!"
+}
+
+Write-Host ""
+Write-Host "📧 Email: $testEmail" -ForegroundColor White
+Write-Host "🔑 Password: $('*' * $testPassword.Length)" -ForegroundColor White
 Write-Host ""
 
 # Test 1: Obtener token JWT mediante login
