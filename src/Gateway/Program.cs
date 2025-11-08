@@ -535,14 +535,6 @@ app.MapPost("/api/v1/translate", async (
 {
     try
     {
-        // Console.WriteLine($"=== TRANSLATE ENDPOINT DEBUG ===");
-        // Console.WriteLine($"Service: {validatedReq.Service}");
-        // Console.WriteLine($"Method: {validatedReq.Method}");
-        // Console.WriteLine($"Path: {validatedReq.Path}");
-        // Console.WriteLine($"Body: {validatedReq.Body}");
-        // Console.WriteLine($"Body ValueKind: {validatedReq.Body?.ValueKind.ToString() ?? "null"}");
-        // Console.WriteLine($"Content-Length: {http.Request.ContentLength}");
-
         // 1. Validación de tamaño de payload
         var max = opts.Value.MaxPayloadSizeBytes;
         if (http.Request.ContentLength is long len && len > max)
