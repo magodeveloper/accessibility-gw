@@ -1,0 +1,11 @@
+{
+  "service": "analysis",
+  "method": "GET",
+  "path": "/api/CompositeAnalysis/by-user?userId=2",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJ1c2VyQG91dGxvb2suY29tIiwibmFtZSI6Ikdlb3Zhbm55IENhbWFjaG8iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJ1c2VyIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiIyIiwianRpIjoiNTE0NThlNDktOWZmNS00YTk3LWI5OWQtYTc2NjEyOWE2MWJkIiwiaWF0IjoiMTc2Mjc1Nzc1MiIsIm5iZiI6MTc2Mjc1Nzc1MiwiZXhwIjoxNzYyODQ0MTUyLCJpc3MiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20iLCJhdWQiOiJodHRwczovL2FjY2Vzc2liaWxpdHkuY29tcGFueS5jb20ifQ.l5rBMK_51rEZOmGnnzJ6VO7cy1ZHtsaHbXgFJ4NMkkw"
+  },
+  "body": {},
+  "description": "Obtener todos los análisis completos de un usuario con resultados y errores - GET /api/CompositeAnalysis/by-user"
+}
