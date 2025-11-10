@@ -11,7 +11,7 @@
         <!-- ASP.NET Core - Framework Principal -->
         <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
         <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
-        <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+        <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.10" />
         <PackageVersion Include="Microsoft.AspNetCore.Diagnostics.HealthChecks" Version="2.2.0" />
         <!-- Rate Limiting - Usando versión disponible -->
         <PackageVersion Include="Microsoft.AspNetCore.RateLimiting" Version="7.0.0-rc.2.22476.2" />
