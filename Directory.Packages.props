@@ -25,7 +25,7 @@
         <PackageVersion Include="prometheus-net.AspNetCore" Version="8.2.1" />
         <!-- Caching y Redis -->
         <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.0" />
+        <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.10" />
         <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
         <!-- Resilience -->
         <PackageVersion Include="Polly.Extensions.Http" Version="3.0.0" />
