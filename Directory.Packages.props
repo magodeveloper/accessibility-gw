@@ -9,7 +9,7 @@
         <PackageVersion Include="Microsoft.NET.Sdk" Version="9.0.100" />
         <PackageVersion Include="Microsoft.NET.Sdk.Web" Version="9.0.100" />
         <!-- ASP.NET Core - Framework Principal -->
-        <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+        <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10" />
         <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
         <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
         <PackageVersion Include="Microsoft.AspNetCore.Diagnostics.HealthChecks" Version="2.2.0" />
