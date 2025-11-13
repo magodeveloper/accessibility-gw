@@ -18,6 +18,7 @@ services:
       - Gate__Services__users=http://msusers-api:8081
       - Gate__Services__reports=http://msreports-api:8083
       - Gate__Services__analysis=http://msanalysis-api:8082
+      - Gate__Services__intelligence=http://msintelligence-api:8084
       - Gate__Services__middleware=http://accessibility-mw:3001
       - Jwt__SecretKey=9b3e7ER@S^glvxPWKX8nN?DTqtrd%Yj!oVIfh+BG&piHwZz6ky4Q52MumOFA-Lc0
       - Jwt__Issuer=https://accessibility.company.com
@@ -36,13 +37,14 @@ services:
         condition: service_healthy
     volumes:
       - gateway-dev-logs:/app/logs
+      - ./src/Gateway/appsettings.json:/app/appsettings.json:ro
+      - ./src/Gateway/appsettings.Development.json:/app/appsettings.Development.json:ro
       - /etc/localtime:/etc/localtime:ro
     networks:
       - accessibility-shared
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    read_only: true
     tmpfs:
       - /tmp
     healthcheck:
