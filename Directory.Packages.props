@@ -40,7 +40,7 @@
         <PackageVersion Include="AspNetCore.HealthChecks.UI" Version="8.0.2" />
         <PackageVersion Include="AspNetCore.HealthChecks.UI.InMemory.Storage" Version="8.0.1" />
         <PackageVersion Include="AspNetCore.HealthChecks.Uris" Version="8.0.1" />
-        <PackageVersion Include="AspNetCore.HealthChecks.Redis" Version="8.0.1" />
+        <PackageVersion Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
         <!-- Configuration -->
         <PackageVersion Include="Microsoft.Extensions.Configuration" Version="9.0.9" />
         <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables"
