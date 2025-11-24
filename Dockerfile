@@ -1,6 +1,6 @@
 # ===== ETAPA BASE =====
 # Usar la imagen base oficial de .NET 9
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 
 # Labels para metadata
 LABEL maintainer="accessibility-team"
