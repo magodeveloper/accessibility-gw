@@ -1,250 +1,256 @@
-name: CI
+# =============================================================
+# WORKFLOW DESHABILITADO TEMPORALMENTE PARA REDUCIR COSTOS CI/CD
+# Descomente el contenido para reactivar el workflow
+# Fecha de deshabilitacion: 2026-02-22
+# =============================================================
 
-on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'src/**'
-      - 'Dockerfile'
-      - 'docker-compose*.yml'
-      - 'Directory.Packages.props'
-      - '.github/workflows/**'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'Dockerfile'
-      - 'docker-compose*.yml'
-      - 'Directory.Packages.props'
-      - '.github/workflows/**'
-  release:
-    types: [published]
+# name: CI
 
-env:
-  DOTNET_VERSION: '9.0.x'
-  IMAGE_NAME: accessibility-gateway
-  REGISTRY: ghcr.io
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-  DOTNET_NOLOGO: true
-  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+# on:
+#   push:
+#     branches: [main, develop]
+#     paths:
+#       - 'src/**'
+#       - 'Dockerfile'
+#       - 'docker-compose*.yml'
+#       - 'Directory.Packages.props'
+#       - '.github/workflows/**'
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - 'src/**'
+#       - 'Dockerfile'
+#       - 'docker-compose*.yml'
+#       - 'Directory.Packages.props'
+#       - '.github/workflows/**'
+#   release:
+#     types: [published]
 
-jobs:
-  build-test:
-    runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
+# env:
+#   DOTNET_VERSION: '9.0.x'
+#   IMAGE_NAME: accessibility-gateway
+#   REGISTRY: ghcr.io
+#   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+#   DOTNET_NOLOGO: true
+#   DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
-    steps:
-      - uses: actions/checkout@v4
+# jobs:
+#   build-test:
+#     runs-on: ubuntu-latest
+#     services:
+#       redis:
+#         image: redis:7-alpine
+#         ports:
+#           - 6379:6379
+#         options: >-
+#           --health-cmd "redis-cli ping"
+#           --health-interval 10s
+#           --health-timeout 5s
+#           --health-retries 3
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Cache .NET packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+#       - name: Setup .NET
+#         uses: actions/setup-dotnet@v4
+#         with:
+#           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore dependencies
-        run: dotnet restore Gateway.sln
+#       - name: Cache .NET packages
+#         uses: actions/cache@v4
+#         with:
+#           path: ~/.nuget/packages
+#           key: ${{ runner.os }}-nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+#           restore-keys: |
+#             ${{ runner.os }}-nuget-
 
-      - name: Build
-        run: dotnet build Gateway.sln --no-restore --configuration Release
+#       - name: Restore dependencies
+#         run: dotnet restore Gateway.sln
 
-      - name: Run Unit Tests
-        run: |
-          dotnet test src/tests/Gateway.UnitTests/Gateway.UnitTests.csproj \
-            --no-build --configuration Release \
-            --collect:"XPlat Code Coverage" \
-            --results-directory ./TestResults \
-            --logger "trx;LogFileName=unit-tests.trx"
+#       - name: Build
+#         run: dotnet build Gateway.sln --no-restore --configuration Release
 
-      - name: Run Integration Tests
-        run: |
-          dotnet test src/tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj \
-            --no-build --configuration Release \
-            --collect:"XPlat Code Coverage" \
-            --results-directory ./TestResults \
-            --logger "trx;LogFileName=integration-tests.trx"
-        env:
-          REDIS_CONNECTION_STRING: 'localhost:6379'
+#       - name: Run Unit Tests
+#         run: |
+#           dotnet test src/tests/Gateway.UnitTests/Gateway.UnitTests.csproj \
+#             --no-build --configuration Release \
+#             --collect:"XPlat Code Coverage" \
+#             --results-directory ./TestResults \
+#             --logger "trx;LogFileName=unit-tests.trx"
 
-      - name: Generate Coverage Report
-        run: |
-          dotnet tool install --global dotnet-reportgenerator-globaltool || true
-          reportgenerator \
-            -reports:"TestResults/**/coverage.cobertura.xml" \
-            -targetdir:"coverage-report" \
-            -reporttypes:"Html;Cobertura"
+#       - name: Run Integration Tests
+#         run: |
+#           dotnet test src/tests/Gateway.IntegrationTests/Gateway.IntegrationTests.csproj \
+#             --no-build --configuration Release \
+#             --collect:"XPlat Code Coverage" \
+#             --results-directory ./TestResults \
+#             --logger "trx;LogFileName=integration-tests.trx"
+#         env:
+#           REDIS_CONNECTION_STRING: 'localhost:6379'
 
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results
-          path: TestResults/**
-          retention-days: 30
+#       - name: Generate Coverage Report
+#         run: |
+#           dotnet tool install --global dotnet-reportgenerator-globaltool || true
+#           reportgenerator \
+#             -reports:"TestResults/**/coverage.cobertura.xml" \
+#             -targetdir:"coverage-report" \
+#             -reporttypes:"Html;Cobertura"
 
-      - name: Report coverage
-        uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          files: 'TestResults/**/coverage.cobertura.xml'
-          fail_ci_if_error: false
+#       - name: Upload Test Results
+#         uses: actions/upload-artifact@v4
+#         if: always()
+#         with:
+#           name: test-results
+#           path: TestResults/**
+#           retention-days: 30
 
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: build-test
-    if: github.event_name != 'pull_request'
+#       - name: Report coverage
+#         uses: codecov/codecov-action@v4
+#         if: always()
+#         with:
+#           files: 'TestResults/**/coverage.cobertura.xml'
+#           fail_ci_if_error: false
 
-    steps:
-      - uses: actions/checkout@v4
+#   security-scan:
+#     runs-on: ubuntu-latest
+#     needs: build-test
+#     if: github.event_name != 'pull_request'
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './src'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Upload scan results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
+#       - name: Run Trivy vulnerability scanner
+#         uses: aquasecurity/trivy-action@master
+#         with:
+#           scan-type: 'fs'
+#           scan-ref: './src'
+#           format: 'sarif'
+#           output: 'trivy-results.sarif'
 
-  docker-build:
-    runs-on: ubuntu-latest
-    needs: [build-test, security-scan]
-    if: github.event_name != 'pull_request' && (success() || needs.security-scan.result == 'skipped')
+#       - name: Upload scan results
+#         uses: github/codeql-action/upload-sarif@v3
+#         if: always()
+#         with:
+#           sarif_file: 'trivy-results.sarif'
 
-    permissions:
-      contents: read
-      packages: write
+#   docker-build:
+#     runs-on: ubuntu-latest
+#     needs: [build-test, security-scan]
+#     if: github.event_name != 'pull_request' && (success() || needs.security-scan.result == 'skipped')
 
-    steps:
-      - uses: actions/checkout@v4
+#     permissions:
+#       contents: read
+#       packages: write
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+#       - name: Log in to Container Registry
+#         uses: docker/login-action@v3
+#         with:
+#           registry: ${{ env.REGISTRY }}
+#           username: ${{ github.actor }}
+#           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+#       - name: Extract metadata
+#         id: meta
+#         uses: docker/metadata-action@v5
+#         with:
+#           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+#           tags: |
+#             type=ref,event=branch
+#             type=semver,pattern={{version}}
+#             type=sha,prefix={{branch}}-
+#             type=raw,value=latest,enable={{is_default_branch}}
 
-  e2e-tests:
-    runs-on: ubuntu-latest
-    needs: docker-build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+#       - name: Build and push
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: .
+#           file: ./Dockerfile
+#           push: true
+#           tags: ${{ steps.meta.outputs.tags }}
+#           labels: ${{ steps.meta.outputs.labels }}
+#           cache-from: type=gha
+#           cache-to: type=gha,mode=max
 
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
+#   e2e-tests:
+#     runs-on: ubuntu-latest
+#     needs: docker-build
+#     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
 
-    steps:
-      - uses: actions/checkout@v4
+#     services:
+#       redis:
+#         image: redis:7-alpine
+#         ports:
+#           - 6379:6379
+#         options: >-
+#           --health-cmd "redis-cli ping"
+#           --health-interval 10s
+#           --health-timeout 5s
+#           --health-retries 3
 
-      - name: Start test environment
-        run: |
-          docker network create test-network || true
-          docker run -d --name test-redis --network test-network redis:7-alpine
+#     steps:
+#       - uses: actions/checkout@v4
 
-          # Usar la imagen construida en el job anterior
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}"
-          echo "Using image: $IMAGE_TAG"
+#       - name: Start test environment
+#         run: |
+#           docker network create test-network || true
+#           docker run -d --name test-redis --network test-network redis:7-alpine
 
-          docker run -d --name test-gateway \
-            --network test-network -p 8080:8080 \
-            -e REDIS_CONNECTION_STRING="test-redis:6379" \
-            -e ASPNETCORE_ENVIRONMENT="Testing" \
-            -e ASPNETCORE_URLS="http://+:8080" \
-            "$IMAGE_TAG"
+#           # Usar la imagen construida en el job anterior
+#           IMAGE_TAG="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}"
+#           echo "Using image: $IMAGE_TAG"
 
-      - name: Wait for services
-        run: |
-          echo "Waiting for Gateway to be ready..."
-          timeout 60 sh -c 'until curl -f http://localhost:8080/health/ready; do echo "Waiting..."; sleep 2; done'
-          echo "Gateway is ready!"
+#           docker run -d --name test-gateway \
+#             --network test-network -p 8080:8080 \
+#             -e REDIS_CONNECTION_STRING="test-redis:6379" \
+#             -e ASPNETCORE_ENVIRONMENT="Testing" \
+#             -e ASPNETCORE_URLS="http://+:8080" \
+#             "$IMAGE_TAG"
 
-      - name: Run E2E tests
-        run: |
-          echo "Running health checks..."
-          curl -f http://localhost:8080/health/live || exit 1
-          curl -f http://localhost:8080/health/ready || exit 1
-          curl -f http://localhost:8080/metrics || exit 1
+#       - name: Wait for services
+#         run: |
+#           echo "Waiting for Gateway to be ready..."
+#           timeout 60 sh -c 'until curl -f http://localhost:8080/health/ready; do echo "Waiting..."; sleep 2; done'
+#           echo "Gateway is ready!"
 
-          echo "Testing API endpoints..."
-          curl -i http://localhost:8080/api/v1/users/health || echo "Expected: Upstream service not available"
+#       - name: Run E2E tests
+#         run: |
+#           echo "Running health checks..."
+#           curl -f http://localhost:8080/health/live || exit 1
+#           curl -f http://localhost:8080/health/ready || exit 1
+#           curl -f http://localhost:8080/metrics || exit 1
 
-          echo "E2E tests completed successfully!"
+#           echo "Testing API endpoints..."
+#           curl -i http://localhost:8080/api/v1/users/health || echo "Expected: Upstream service not available"
 
-      - name: Cleanup
-        if: always()
-        run: |
-          docker stop test-gateway test-redis || true
-          docker rm test-gateway test-redis || true
-          docker network rm test-network || true
+#           echo "E2E tests completed successfully!"
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: [docker-build, e2e-tests]
-    if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.event_name == 'release')
+#       - name: Cleanup
+#         if: always()
+#         run: |
+#           docker stop test-gateway test-redis || true
+#           docker rm test-gateway test-redis || true
+#           docker network rm test-network || true
 
-    steps:
-      - uses: actions/checkout@v4
+#   deploy:
+#     runs-on: ubuntu-latest
+#     needs: [docker-build, e2e-tests]
+#     if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.event_name == 'release')
 
-      - name: Deploy to environment
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-            echo "Deploying to Development"
-            echo "Image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:develop"
-          elif [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.event_name }}" = "release" ]; then
-            echo "Deploying to Production"
-            echo "Image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest"
-          fi
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: Deploy to environment
+#         run: |
+#           if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+#             echo "Deploying to Development"
+#             echo "Image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:develop"
+#           elif [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.event_name }}" = "release" ]; then
+#             echo "Deploying to Production"
+#             echo "Image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest"
+#           fi
